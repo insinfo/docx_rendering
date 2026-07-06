@@ -257,8 +257,85 @@ extension on HtmlRenderer {
         return _renderImage(this, element as IDomImage);
       case DomType.altChunk:
         return _renderAltChunk(this, element as WmlAltChunk);
+      case DomType.mmlMath:
+        return _renderContainerNS(this, element, HtmlNs.mathML, 'math', {'xmlns': HtmlNs.mathML});
+      case DomType.mmlMathParagraph:
+        return _renderContainer(this, element, 'span');
+      case DomType.mmlFraction:
+        return _renderContainerNS(this, element, HtmlNs.mathML, 'mfrac');
+      case DomType.mmlBase:
+        final parentType = element.parent?.type;
+        final tagName = parentType == DomType.mmlMatrixRow ? 'mtd' : 'mrow';
+        return _renderContainerNS(this, element, HtmlNs.mathML, tagName);
+      case DomType.mmlNumerator:
+      case DomType.mmlDenominator:
+      case DomType.mmlFunction:
+      case DomType.mmlLimit:
+      case DomType.mmlBox:
+        return _renderContainerNS(this, element, HtmlNs.mathML, 'mrow');
+      case DomType.mmlLimitLower:
+        return _renderContainerNS(this, element, HtmlNs.mathML, 'munder');
+      case DomType.mmlMatrix:
+        return _renderContainerNS(this, element, HtmlNs.mathML, 'mtable');
+      case DomType.mmlMatrixRow:
+        return _renderContainerNS(this, element, HtmlNs.mathML, 'mtr');
+      case DomType.mmlSuperscript:
+        return _renderContainerNS(this, element, HtmlNs.mathML, 'msup');
+      case DomType.mmlSubscript:
+        return _renderContainerNS(this, element, HtmlNs.mathML, 'msub');
+      case DomType.mmlDegree:
+      case DomType.mmlSuperArgument:
+      case DomType.mmlSubArgument:
+        return _renderContainerNS(this, element, HtmlNs.mathML, 'mn');
+      case DomType.mmlFunctionName:
+        return _renderContainerNS(this, element, HtmlNs.mathML, 'ms');
+      case DomType.mmlRadical:
+        return _renderMmlRadical(this, element);
+      case DomType.mmlDelimiter:
+        return _renderMmlDelimiter(this, element);
+      case DomType.mmlNary:
+        return _renderMmlNary(this, element);
+      case DomType.mmlPreSubSuper:
+        return _renderMmlPreSubSuper(this, element);
+      case DomType.mmlGroupChar:
+        return _renderMmlGroupChar(this, element);
+      case DomType.mmlBar:
+        return _renderMmlBar(this, element);
+      case DomType.mmlRun:
+        return _renderMmlRun(this, element);
+      case DomType.mmlEquationArray:
+        return _renderMllList(this, element);
+      case DomType.vmlPicture:
+        return _renderVmlPicture(this, element);
+      case DomType.vmlElement:
+        return _renderVmlElement(this, element as VmlElement);
+      case DomType.inserted:
+        return _renderInserted(this, element);
+      case DomType.deleted:
+        return _renderDeleted(this, element);
       default:
         return null;
     }
   }
+}
+
+web.Node? _renderInserted(HtmlRenderer self, OpenXmlElement elem) {
+  if (self.options.renderChanges) {
+    return _renderContainer(self, elem, 'ins');
+  }
+  final elements = elem.children != null
+      ? elem.children!.map((e) => self.renderElement(e)).whereType<web.Node>().toList()
+      : <web.Node>[];
+  final fragment = web.document.createDocumentFragment();
+  for (final el in elements) {
+    fragment.appendChild(el);
+  }
+  return fragment;
+}
+
+web.Node? _renderDeleted(HtmlRenderer self, OpenXmlElement elem) {
+  if (self.options.renderChanges) {
+    return _renderContainer(self, elem, 'del');
+  }
+  return null;
 }

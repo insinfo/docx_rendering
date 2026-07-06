@@ -21,11 +21,14 @@ import 'header_footer/parts.dart';
 import 'common/part.dart';
 import 'common/relationship.dart';
 import 'html.dart';
+import 'vml/vml.dart';
 
 part 'renderer/html_renderer_core.dart';
 part 'renderer/html_renderer_styles.dart';
 part 'renderer/html_renderer_tables.dart';
 part 'renderer/html_renderer_blocks.dart';
+part 'renderer/html_renderer_math.dart';
+part 'renderer/html_renderer_vml.dart';
 
 class CellPos {
   int col;
