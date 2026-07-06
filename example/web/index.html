@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docx Rendering Test</title>
+    <script defer src="main.dart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+        #container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 40px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div style="margin-bottom: 20px;">
+        <input type="file" id="fileInput" accept=".docx" />
+    </div>
+    <div id="container">
+        <!-- Rendered DOCX will appear here -->
+    </div>
+</body>
+</html>
