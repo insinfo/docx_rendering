@@ -110,13 +110,19 @@ List<web.Node> _renderTheme(HtmlRenderer self, ThemePart themePart) {
 List<web.Node> _renderStyles(HtmlRenderer self, List<IDomStyle> styles) {
   var styleText = '';
   final stylesMap = self.styleMap!;
-  final defStyle = stylesMap['default'];
+
+  final defaultStyles = <String, IDomStyle>{};
+  for (final s in styles) {
+    if (s.isDefault == true && s.target != null) {
+      defaultStyles[s.target!] = s;
+    }
+  }
 
   for (final style in styles) {
     var subStyles = style.styles;
 
     if (style.linked != null) {
-      var linkedStyle = style.linked != null ? stylesMap[style.linked!] : null;
+      var linkedStyle = stylesMap[style.linked!];
 
       if (linkedStyle != null) {
         subStyles = subStyles.toList()..addAll(linkedStyle.styles);
@@ -126,23 +132,14 @@ List<web.Node> _renderStyles(HtmlRenderer self, List<IDomStyle> styles) {
     }
 
     for (final subStyle in subStyles) {
-      if (subStyle.target == null || subStyle.target!.isEmpty) continue;
-      var selector = '';
+      var selector = '${style.target ?? ''}.${style.cssName}';
 
-      if (style.target == subStyle.target) {
-        selector = '${style.cssName}';
-      } else if (style.target != null) {
-        selector = '${style.cssName} ${subStyle.target}';
-      } else {
-        selector = '.${self.className} ${subStyle.target}.${style.cssName}';
+      if (style.target != subStyle.target && subStyle.target != null) {
+        selector += ' ${subStyle.target}';
       }
 
-      if (defStyle != null && style == defStyle) {
-        selector = '.${self.className} ${subStyle.target}';
-      }
-
-      if (subStyle.mod != null) {
-        selector += subStyle.mod!;
+      if (style.target != null && defaultStyles[style.target!] == style) {
+        selector = '.${self.className} ${style.target}, ' + selector;
       }
 
       styleText += _styleToString(selector, subStyle.values) + '\n';
