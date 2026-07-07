@@ -4,10 +4,12 @@ import 'package:web/web.dart' as web;
 import 'package:docx_rendering/docx_rendering.dart';
 
 void main() {
+  print('main() initialized!');
   final fileInput = web.document.getElementById('fileInput') as web.HTMLInputElement;
   final container = web.document.getElementById('container') as web.HTMLElement;
 
   fileInput.addEventListener('change', (web.Event e) {
+    print('File input change event fired!');
     final files = fileInput.files;
     if (files != null && files.length > 0) {
       final file = files.item(0)!;

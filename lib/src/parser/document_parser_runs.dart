@@ -100,6 +100,20 @@ void _parseParagraphProperties(
 
     return true;
   });
+
+  final props = paragraph.props as ParagraphProperties;
+  paragraph.styleName = props.styleName;
+  paragraph.sectionProps = props.sectionProps;
+  paragraph.tabs = props.tabs;
+  paragraph.numbering = props.numbering;
+  paragraph.border = props.border;
+  paragraph.textAlignment = props.textAlignment;
+  paragraph.lineSpacing = props.lineSpacing;
+  paragraph.keepLines = props.keepLines;
+  paragraph.keepNext = props.keepNext;
+  paragraph.pageBreakBefore = props.pageBreakBefore;
+  paragraph.outlineLevel = props.outlineLevel;
+  paragraph.runProps = props.runProps;
 }
 
 void _parseFrame(DocumentParser self, dynamic node, WmlParagraph paragraph) {
@@ -119,8 +133,10 @@ WmlHyperlink _parseHyperlink(
     ..id = globalXmlParser.attr(node, 'id');
 
   for (final el in globalXmlParser.elements(node)) {
-    if (globalXmlParser.localName(el) == 'r') {
-      result.children!.add(self.parseRun(el, result));
+    switch (globalXmlParser.localName(el)) {
+      case 'r':
+        result.children!.add(self.parseRun(el, result));
+        break;
     }
   }
 
@@ -136,8 +152,13 @@ WmlSmartTag _parseSmartTag(
     ..element = globalXmlParser.attr(node, 'element');
 
   for (final el in globalXmlParser.elements(node)) {
-    if (globalXmlParser.localName(el) == 'r') {
-      result.children!.add(self.parseRun(el, result));
+    switch (globalXmlParser.localName(el)) {
+      case 'r':
+        result.children!.add(self.parseRun(el, result));
+        break;
+      case 'smartTag':
+        result.children!.add(self.parseSmartTag(el, result));
+        break;
     }
   }
 
@@ -149,42 +170,58 @@ WmlRun _parseRun(DocumentParser self, dynamic node, [OpenXmlElement? parent]) {
     ..parent = parent
     ..children = [];
 
-  for (final el in globalXmlParser.elements(node)) {
+  for (var el in globalXmlParser.elements(node)) {
+    el = _checkAlternateContent(el);
+
     switch (globalXmlParser.localName(el)) {
       case 'rPr':
-        result.cssStyle = self.parseDefaultProperties(el, {});
-        result.id = globalXmlParser.elementAttr(el, 'rStyle', 'val');
-        result.runProps = parseRunProperties(el, globalXmlParser);
+        _parseRunProperties(self, el, result);
         break;
       case 't':
         result.children!.add(WmlText(globalXmlParser.textContent(el) ?? ''));
         break;
+      case 'delText':
+        final delText = WmlText(globalXmlParser.textContent(el) ?? '');
+        delText.type = DomType.deletedText;
+        result.children!.add(delText);
+        break;
       case 'fldChar':
+        result.fieldRun = true;
         final type = globalXmlParser.attr(el, 'fldCharType');
         if (type != null) {
           result.children!.add(WmlFieldChar(charType: type));
         }
         break;
       case 'instrText':
+        result.fieldRun = true;
         result.children!.add(WmlInstructionText(text: globalXmlParser.textContent(el) ?? ''));
         break;
+      case 'fldSimple':
+        result.children!.add(WmlFieldSimple(
+          instruction: globalXmlParser.attr(el, 'instr'),
+        ));
+        break;
       case 'noBreakHyphen':
-        result.children!.add(WmlText('\u2011'));
+        result.children!.add(OpenXmlElementBase(type: DomType.noBreakHyphen));
+        break;
+      case 'br':
+        result.children!.add(WmlBreak(
+          breakType: globalXmlParser.attr(el, 'type') ?? 'textWrapping',
+        ));
+        break;
+      case 'lastRenderedPageBreak':
+        result.children!.add(WmlBreak(
+          breakType: 'lastRenderedPageBreak',
+        ));
         break;
       case 'softHyphen':
         result.children!.add(WmlText('\u00AD'));
         break;
       case 'sym':
         result.children!.add(WmlSymbol(
-        globalXmlParser.attr(el, 'font') ?? '',
-        globalXmlParser.hexAttr(el, 'char') ?? 0
-      ));
-        break;
-      case 'br':
-        result.children!.add(WmlBreak(
-        breakType: globalXmlParser.attr(el, 'type') ?? 'textWrapping',
-        clear: globalXmlParser.attr(el, 'clear') == 'all'
-      ));
+          globalXmlParser.attr(el, 'font') ?? '',
+          globalXmlParser.hexAttr(el, 'char') ?? 0
+        ));
         break;
       case 'tab':
         result.children!.add(OpenXmlElementBase(type: DomType.tab));
@@ -194,8 +231,7 @@ WmlRun _parseRun(DocumentParser self, dynamic node, [OpenXmlElement? parent]) {
         if (d != null) result.children!.add(d);
         break;
       case 'pict':
-        final pt = self.parseDrawingWrapper(el);
-        if (pt != null) result.children!.add(pt);
+        result.children!.add(self.parseVmlPicture(el));
         break;
       case 'ruby':
         final r = self.parseRuby(el);
@@ -216,20 +252,101 @@ WmlRun _parseRun(DocumentParser self, dynamic node, [OpenXmlElement? parent]) {
   return result;
 }
 
+/// Parses run properties from <rPr> following the TS pattern.
+void _parseRunProperties(DocumentParser self, dynamic elem, WmlRun run) {
+  run.cssStyle = self.parseDefaultProperties(elem, {}, null, (c) {
+    switch (globalXmlParser.localName(c)) {
+      case 'rStyle':
+        run.styleName = globalXmlParser.attr(c, 'val');
+        break;
+      case 'vertAlign':
+        run.verticalAlign = _valueOfVertAlign(c);
+        break;
+      default:
+        return false;
+    }
+    return true;
+  });
+}
+
+/// Returns the HTML tag name for vertical alignment.
+String? _valueOfVertAlign(dynamic elem) {
+  final val = globalXmlParser.attr(elem, 'val');
+  switch (val) {
+    case 'superscript':
+      return 'sup';
+    case 'subscript':
+      return 'sub';
+    default:
+      return null;
+  }
+}
+
+/// Handles AlternateContent elements by picking Choice or Fallback.
+web.Element _checkAlternateContent(web.Element elem) {
+  if (elem.localName != 'AlternateContent') return elem;
+
+  final children = elem.childNodes;
+  for (var i = 0; i < children.length; i++) {
+    final c = children.item(i)!;
+    if (c.nodeType == web.Node.ELEMENT_NODE) {
+      final el = c as web.Element;
+      if (el.localName == 'Fallback') {
+        final first = el.firstElementChild;
+        if (first != null) return first;
+      }
+    }
+  }
+
+  return elem;
+}
+
 OpenXmlElement _parseMathElement(DocumentParser self, dynamic elem) {
+  final propsTag = '${globalXmlParser.localName(elem)}Pr';
   final result = OpenXmlElementBase(
       type: _mmlTagMap[globalXmlParser.localName(elem)] ?? DomType.mmlMath);
   result.children = [];
 
   for (final el in globalXmlParser.elements(elem)) {
+    final childType = _mmlTagMap[globalXmlParser.localName(el)];
+
+    if (childType != null) {
+      result.children!.add(self.parseMathElement(el));
+    } else if (globalXmlParser.localName(el) == 'r') {
+      final run = self.parseRun(el);
+      run.type = DomType.mmlRun;
+      result.children!.add(run);
+    } else if (globalXmlParser.localName(el) == propsTag) {
+      result.props = _parseMathProperties(el);
+    }
+  }
+
+  return result;
+}
+
+/// Parses math element properties.
+Map<String, dynamic> _parseMathProperties(dynamic elem) {
+  final result = <String, dynamic>{};
+
+  for (final el in globalXmlParser.elements(elem)) {
     switch (globalXmlParser.localName(el)) {
-      case 'r':
-        final run = self.parseRun(el);
-        run.type = DomType.mmlRun;
-        result.children!.add(run);
+      case 'chr':
+        result['char'] = globalXmlParser.attr(el, 'val');
         break;
-      default:
-        result.children!.add(self.parseMathElement(el));
+      case 'vertJc':
+        result['verticalJustification'] = globalXmlParser.attr(el, 'val');
+        break;
+      case 'pos':
+        result['position'] = globalXmlParser.attr(el, 'val');
+        break;
+      case 'degHide':
+        result['hideDegree'] = globalXmlParser.boolAttr(el, 'val');
+        break;
+      case 'begChr':
+        result['beginChar'] = globalXmlParser.attr(el, 'val');
+        break;
+      case 'endChr':
+        result['endChar'] = globalXmlParser.attr(el, 'val');
         break;
     }
   }

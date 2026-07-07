@@ -209,3 +209,11 @@
 
 4. Os dois maiores arquivos (`document-parser.ts` = 1735 linhas, `html-renderer.ts` = 1469 linhas)
    serão portados por último, quando toda a infraestrutura já estiver compilando.
+
+### Fase 8 — Correção de Bugs Visuais (Julho 2026)
+- [x] 8.1 Corrigir parseamento de Underline e formatações de texto (Bugs de XML/boolAttr)
+- [x] 8.2 Corrigir estruturação da árvore DOM (parágrafos, runs e document element wrapper)
+- [x] 8.3 Reescrever Renderers do HTML (blocos, core, drawing, tables e styles) usando `toHTML` para propagar CSS corretamente
+- [x] 8.4 Corrigir Numeração/Bullets (Listas) (Counter increment/reset do CSS e imagens de bullets)
+- [x] 8.5 Atualizar tipos e propriedades ausentes de `SectionProperties`, `ParagraphProperties` e models.
+- [x] 8.6 Consertar erros de build e inferência de tipos com `package:web`.

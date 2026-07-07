@@ -5,17 +5,7 @@ List<web.Node> _renderMmlElements(HtmlRenderer self, List<OpenXmlElement>? eleme
   return elements.map((e) => self.renderElement(e)).whereType<web.Node>().toList();
 }
 
-web.Node _renderContainerNS(HtmlRenderer self, OpenXmlElement elem, String ns, String tagName, [Map<String, dynamic>? props]) {
-  final Map<String, dynamic> elementMap = {
-    'ns': ns,
-    'tagName': tagName,
-    'children': _renderMmlElements(self, elem.children)
-  };
-  if (props != null) {
-    elementMap.addAll(props);
-  }
-  return self.hFunc(elementMap) as web.Node;
-}
+
 
 web.Node _createMathMLElement(HtmlRenderer self, String tagName, [Map<String, dynamic>? props, List<dynamic>? children]) {
   final Map<String, dynamic> elementMap = {

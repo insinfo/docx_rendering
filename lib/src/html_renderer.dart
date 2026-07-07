@@ -43,7 +43,7 @@ class Section {
   Section(this.sectProps, this.elements, this.pageBreak);
 }
 
-typedef CellVerticalMergeType = Map<int, web.HTMLTableCellElement>;
+typedef CellVerticalMergeType = Map<int, web.HTMLTableCellElement?>;
 
 /// Renders a [WordDocument] into HTML elements.
 class HtmlRenderer {
@@ -59,8 +59,8 @@ class HtmlRenderer {
   List<CellPos> tableCellPositions = [];
   CellPos? currentCellPosition;
 
-  Map<String, WmlFootnote> footnoteMap = {};
-  Map<String, WmlFootnote> endnoteMap = {};
+  Map<String, WmlBaseNote> footnoteMap = {};
+  Map<String, WmlBaseNote> endnoteMap = {};
   List<String> currentFootnoteIds = [];
   List<String> currentEndnoteIds = [];
   List<String> usedHederFooterParts = [];
@@ -133,7 +133,7 @@ class HtmlRenderer {
     }
 
     if (document.endnotesPart != null) {
-      endnoteMap = {for (var x in document.endnotesPart!.notes) x.id ?? '': x as WmlFootnote};
+      endnoteMap = {for (var x in document.endnotesPart!.notes) x.id ?? '': x};
     }
 
     if (document.settingsPart != null) {

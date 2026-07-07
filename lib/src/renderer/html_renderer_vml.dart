@@ -1,14 +1,6 @@
 part of '../html_renderer.dart';
 
-web.HTMLElement _renderContainer(HtmlRenderer self, OpenXmlElement elem, String tagName) {
-  final children = elem.children != null 
-      ? elem.children!.map((e) => self.renderElement(e)).whereType<web.Node>().toList()
-      : <web.Node>[];
-  return self.hFunc({
-    'tagName': tagName,
-    'children': children
-  }) as web.HTMLElement;
-}
+
 
 web.Node _renderVmlPicture(HtmlRenderer self, OpenXmlElement elem) {
   return _renderContainer(self, elem, 'div');

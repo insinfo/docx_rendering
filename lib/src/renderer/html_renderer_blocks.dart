@@ -1,20 +1,20 @@
 part of '../html_renderer.dart';
 
 web.Node _renderParagraph(HtmlRenderer self, WmlParagraph paragraph) {
-  final style = <String, String>{};
-  _copyStyleProperties(self, paragraph.cssStyle ?? {}, style);
+  final result = _toHTML(self, paragraph, HtmlNs.html, 'p');
 
-  final numberingClass = paragraph.props?.numbering != null
-      ? '${self.className}-num-${paragraph.props!.numbering!.id}-${paragraph.props!.numbering!.level}'
-      : '';
+  final style = self.findStyle(paragraph.styleName);
+  paragraph.tabs ??= style?.paragraphProps?.tabs;
 
-  final children = _renderElements(self, paragraph.children ?? [], self.hFunc({'tagName': 'p'}) as web.HTMLElement);
-  return self.hFunc({
-    'tagName': 'p',
-    'className': '${_processStyleName(self, paragraph.styleName)} ${paragraph.className ?? ''} $numberingClass',
-    'style': style,
-    'children': children
-  }) as web.Node;
+  final numbering = (paragraph.props as ParagraphProperties?)?.numbering ?? style?.paragraphProps?.numbering;
+
+  if (numbering != null) {
+    final existing = result.getAttribute('class') ?? '';
+    final numClass = '${self.className}-num-${numbering.id}-${numbering.level}';
+    result.setAttribute('class', '$existing $numClass'.trim());
+  }
+
+  return result;
 }
 
 web.Node _renderBookmarkStart(HtmlRenderer self, WmlBookmarkStart bookmark) {
@@ -24,61 +24,86 @@ web.Node _renderBookmarkStart(HtmlRenderer self, WmlBookmarkStart bookmark) {
   }) as web.Node;
 }
 
-web.Node _renderRun(HtmlRenderer self, WmlRun run) {
-  if (run.children == null || run.children!.isEmpty) {
-    return self.hFunc({'tagName': 'span'}) as web.Node;
+web.Node? _renderRun(HtmlRenderer self, WmlRun run) {
+  // Skip field runs (instrText, fldChar)
+  if (run.fieldRun == true) return null;
+
+  var children = _renderElements(self, run.children ?? []);
+
+  if (run.verticalAlign != null) {
+    children = [
+      self.hFunc({
+        'tagName': run.verticalAlign,
+        'children': _renderElements(self, run.children ?? [])
+      }) as web.Node
+    ];
   }
 
+  final result = _toHTML(self, run, HtmlNs.html, 'span', children);
 
+  if (run.id != null) {
+    (result as web.HTMLElement).id = run.id!;
+  }
 
-  final children = _renderElements(self, run.children!, self.hFunc({'tagName': 'span'}) as web.HTMLElement);
-  return self.hFunc({
-    'tagName': 'span',
-    'className': run.id != null ? _processStyleName(self, run.id) : '',
-    'style': run.cssStyle ?? {},
-    'children': children
-  }) as web.Node;
+  return result;
 }
 
 web.Node _renderHyperlink(HtmlRenderer self, WmlHyperlink hyperlink) {
-  final children = _renderElements(self, hyperlink.children ?? [], self.hFunc({'tagName': 'a'}) as web.HTMLElement);
   var href = '';
-  if (hyperlink.anchor != null) {
-    href = '#${hyperlink.anchor}';
-  } else if (hyperlink.id != null && self.document.documentPart != null) {
+
+  if (hyperlink.id != null && self.document.documentPart != null) {
     final rel = (self.document.documentPart!.rels ?? <Relationship>[]).cast<Relationship?>().firstWhere(
-        (x) => x?.id == hyperlink.id, orElse: () => null);
+        (x) => x?.id == hyperlink.id && x?.targetMode == 'External', orElse: () => null);
     if (rel != null) {
       href = rel.target;
     }
   }
 
-  return self.hFunc({
-    'tagName': 'a',
-    'href': href,
-    'children': children
-  }) as web.Node;
+  if (hyperlink.anchor != null) {
+    href += '#${hyperlink.anchor}';
+  }
+
+  // Use toHTML-style but set href manually
+  final result = _toHTML(self, hyperlink, HtmlNs.html, 'a');
+  (result as web.HTMLAnchorElement).href = href;
+  return result;
 }
 
 web.Node _renderSmartTag(HtmlRenderer self, WmlSmartTag smartTag) {
-  final children = _renderElements(self, smartTag.children ?? [], self.hFunc({'tagName': 'span'}) as web.HTMLElement);
-  return self.hFunc({
-    'tagName': 'span',
-    'className': '${self.className}-smarttag',
-    'children': children
-  }) as web.Node;
+  return _renderContainer(self, smartTag, 'span');
+}
+
+web.Node _renderDrawing(HtmlRenderer self, OpenXmlElement elem) {
+  final result = _toHTML(self, elem, HtmlNs.html, 'div');
+
+  result.style.display = 'inline-block';
+  result.style.position = 'relative';
+  result.style.textIndent = '0px';
+
+  return result;
 }
 
 web.Node _renderText(HtmlRenderer self, WmlText text) {
   return web.Text(text.text);
 }
 
+web.Node? _renderDeletedText(HtmlRenderer self, WmlText text) {
+  return self.options.renderChanges ? _renderText(self, text) : null;
+}
+
 web.Node _renderTab(HtmlRenderer self, OpenXmlElement tab) {
-  return self.hFunc({
+  final tabSpan = self.hFunc({
     'tagName': 'span',
-    'style': {'white-space': 'pre'},
-    'children': ['\t']
-  }) as web.Node;
+    'children': ['\u2003'] // em space
+  }) as web.HTMLElement;
+
+  if (self.options.experimental) {
+    tabSpan.className = '${self.className}-tab-stop';
+    final stops = _findParent<WmlParagraph>(tab, DomType.paragraph)?.tabs;
+    self.currentTabs.add({'stops': stops, 'span': tabSpan});
+  }
+
+  return tabSpan;
 }
 
 web.Node _renderSymbol(HtmlRenderer self, WmlSymbol symbol) {
@@ -89,64 +114,85 @@ web.Node _renderSymbol(HtmlRenderer self, WmlSymbol symbol) {
   }) as web.Node;
 }
 
-web.Node _renderBreak(HtmlRenderer self, WmlBreak breakEl) {
-  if (breakEl.breakType == 'page' && self.options.breakPages) {
-    return self.hFunc({
-      'tagName': 'hr',
-      'className': '${self.className}-page-break',
-    }) as web.Node;
-  }
-  return self.hFunc({'tagName': 'br'}) as web.Node;
+web.Node? _renderBreak(HtmlRenderer self, WmlBreak breakEl) {
+  // Only render textWrapping breaks as <br>, everything else returns null
+  return breakEl.breakType == 'textWrapping'
+      ? self.hFunc({'tagName': 'br'}) as web.Node
+      : null;
 }
 
-web.Node? _renderNoteReference(HtmlRenderer self, WmlNoteReference noteRef) {
+web.Node _renderFootnoteReference(HtmlRenderer self, WmlNoteReference noteRef) {
+  self.currentFootnoteIds.add(noteRef.id);
   return self.hFunc({
     'tagName': 'sup',
-    'children': [
-      self.hFunc({
-        'tagName': 'a',
-        'href': '#${self.className}-${noteRef.type == DomType.footnoteReference ? 'footnote' : 'endnote'}-${noteRef.id}',
-        'children': ['[${noteRef.id}]']
-      })
-    ]
+    'children': ['${self.currentFootnoteIds.length}']
+  }) as web.Node;
+}
+
+web.Node _renderEndnoteReference(HtmlRenderer self, WmlNoteReference noteRef) {
+  self.currentEndnoteIds.add(noteRef.id);
+  return self.hFunc({
+    'tagName': 'sup',
+    'children': ['${self.currentEndnoteIds.length}']
   }) as web.Node;
 }
 
 web.Node? _renderImage(HtmlRenderer self, IDomImage image) {
-  var src = image.src;
-  if (src.startsWith('word/media/')) {
-    // This is asynchronous, but render methods are mostly synchronous here to avoid breaking the recursive structure
-    // Let's create a placeholder img element and load async
-    final img = self.hFunc({
-      'tagName': 'img',
-      'style': image.cssStyle ?? {},
-    }) as web.HTMLImageElement;
+  final result = _toHTML(self, image, HtmlNs.html, 'img') as web.HTMLImageElement;
+  var transform = image.cssStyle?['transform'];
 
-    self.tasks.add(self.document.loadDocumentImage(src, self.currentPart).then((url) {
-      if (url != null) img.src = url;
-    }));
-    return img;
+  if (image.srcRect != null && image.srcRect!.any((x) => x != 0)) {
+    final left = image.srcRect![0];
+    final top = image.srcRect![1];
+    final right = image.srcRect![2];
+    final bottom = image.srcRect![3];
+    transform = 'scale(${1 / (1 - left - right)}, ${1 / (1 - top - bottom)})';
+    result.style.setProperty('clip-path',
+        'rect(${(100 * top).toStringAsFixed(2)}% ${(100 * (1 - right)).toStringAsFixed(2)}% ${(100 * (1 - bottom)).toStringAsFixed(2)}% ${(100 * left).toStringAsFixed(2)}%)');
   }
 
-  return self.hFunc({
-    'tagName': 'img',
-    'src': src,
-    'style': image.cssStyle ?? {},
-  }) as web.Node;
+  if (image.rotation != null && image.rotation != 0) {
+    transform = 'rotate(${image.rotation}deg) ${transform ?? ''}';
+  }
+
+  if (transform != null && transform.trim().isNotEmpty) {
+    result.style.transform = transform.trim();
+  }
+
+  if (image.src.isNotEmpty) {
+    self.tasks.add(self.document.loadDocumentImage(image.src, self.currentPart).then((url) {
+      if (url != null) result.src = url;
+    }));
+  }
+
+  return result;
 }
 
 web.Node _renderAltChunk(HtmlRenderer self, WmlAltChunk altChunk) {
-  final span = self.hFunc({'tagName': 'span'}) as web.HTMLElement;
-  if (self.options.renderAltChunks) {
-    self.tasks.add(self.document.loadAltChunk(altChunk.id ?? '').then((html) {
-      if (html != null) {
-        span.innerHTML = html.toJS;
-      }
-    }));
-  }
-  return span;
+  if (!self.options.renderAltChunks) return self.hFunc({'tagName': 'span'}) as web.HTMLElement;
+
+  final result = self.hFunc({'tagName': 'iframe'}) as web.HTMLIFrameElement;
+
+  self.tasks.add(self.document.loadAltChunk(altChunk.id ?? '', self.currentPart).then((html) {
+    if (html != null) {
+      result.setAttribute('srcdoc', html);
+    }
+  }));
+
+  return result;
 }
 
 void _refreshTabStops(HtmlRenderer self) {
-  // Ignored for now
+  // Tab stop refresh (experimental feature)
+  if (!self.options.experimental) return;
+  // Implementation would use setTimeout + computePixelToPoint + updateTabStop
+}
+
+/// Finds a parent element of a specific type.
+T? _findParent<T extends OpenXmlElement>(OpenXmlElement elem, DomType type) {
+  var parent = elem.parent;
+  while (parent != null && parent.type != type) {
+    parent = parent.parent;
+  }
+  return parent as T?;
 }

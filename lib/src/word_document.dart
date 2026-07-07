@@ -148,7 +148,7 @@ class WordDocument {
     partsMap[path] = part;
     parts.add(part);
 
-    part.load();
+    await part.load();
 
     if (part.rels?.isNotEmpty == true) {
       final folder = splitPath(part.path).$1;

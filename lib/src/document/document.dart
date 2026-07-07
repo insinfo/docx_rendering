@@ -10,8 +10,4 @@ class DocumentElement extends OpenXmlElement {
 
   DocumentElement({this.sectionProps})
       : super(type: DomType.document, children: []);
-
-  // Override props to return sectionProps for compatibility
-  @override
-  Map<String, dynamic>? get props => null;
 }

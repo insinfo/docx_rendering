@@ -142,6 +142,9 @@ class DocumentParser {
       _parseDrawingWrapper(this, node);
 
   IDomImage? parseDrawing(dynamic node) => _parseDrawing(this, node);
+
+  OpenXmlElement parseVmlPicture(dynamic elem) =>
+      _parseVmlPicture(this, elem);
 }
 
 final _mmlTagMap = {

@@ -39,7 +39,7 @@ DocumentElement _parseDocumentFile(DocumentParser self, dynamic xmlDoc) {
   return DocumentElement()
     ..type = DomType.document
     ..children = xbody != null ? self.parseBodyElements(xbody) : []
-    ..props = sectPr != null ? parseSectionProperties(sectPr, globalXmlParser) : SectionProperties()
+    ..sectionProps = sectPr != null ? parseSectionProperties(sectPr, globalXmlParser) : SectionProperties()
     ..cssStyle = background != null ? self.parseBackground(background) : {};
 }
 
@@ -142,6 +142,26 @@ Map<String, String> _parseDefaultProperties(
       case 'rFonts':
         _parseFont(c, style);
         break;
+      case 'tblBorders':
+      case 'pBdr':
+      case 'tcBorders':
+        _parseBorderProperties(c, style);
+        break;
+      case 'tblCellSpacing':
+        final spacing = _valueOfMargin(c);
+        if (spacing != null) {
+          style['border-spacing'] = spacing;
+          style['border-collapse'] = 'separate';
+        }
+        break;
+      case 'bdr':
+        style['border'] = _valueOfBorder(c);
+        break;
+      case 'vanish':
+        if (globalXmlParser.boolAttr(c, 'val', true) == true) {
+          style['display'] = 'none';
+        }
+        break;
       case 'b':
         style['font-weight'] = globalXmlParser.boolAttr(c, 'val', true) == true ? 'bold' : 'normal';
         break;
@@ -202,14 +222,52 @@ Map<String, String> _parseDefaultProperties(
 
 void _parseFont(dynamic elem, Map<String, String> style) {
   final ascii = globalXmlParser.attr(elem, 'ascii');
+  final asciiTheme = _themeValue(elem, 'asciiTheme');
   final hAnsi = globalXmlParser.attr(elem, 'hAnsi');
   final eastAsia = globalXmlParser.attr(elem, 'eastAsia');
   final cs = globalXmlParser.attr(elem, 'cs');
 
-  // Fallbacks: docxjs uses var fonts = [ascii, hAnsi, eastAsia, cs].filter(x => x).map(encloseFontFamily).join(", ");
-  final fonts = [ascii, hAnsi, eastAsia, cs].where((x) => x != null && x.isNotEmpty).map((x) => encloseFontFamily(x!)).join(', ');
+  final fonts = [ascii, asciiTheme, hAnsi, eastAsia, cs].where((x) => x != null && x.isNotEmpty).map((x) => encloseFontFamily(x!)).toSet().join(', ');
 
   if (fonts.isNotEmpty) {
     style['font-family'] = fonts;
+  }
+}
+
+String? _themeValue(dynamic c, String attr) {
+  final val = globalXmlParser.attr(c, attr);
+  return val != null ? 'var(--docx-$val-font)' : null;
+}
+
+String? _valueOfMargin(dynamic c) {
+  return globalXmlParser.lengthAttr(c, 'w');
+}
+
+String _valueOfBorder(dynamic c) {
+  final type = globalXmlParser.attr(c, 'val');
+  if (type == 'nil') return 'none';
+  final color = globalXmlParser.colorAttr(c, 'color') ?? 'black';
+  final size = globalXmlParser.lengthAttr(c, 'sz', LengthUsage.border) ?? '1px';
+  return '$size solid ${color == 'auto' ? 'black' : color}';
+}
+
+void _parseBorderProperties(dynamic node, Map<String, String> style) {
+  for (final c in globalXmlParser.elements(node)) {
+    switch (globalXmlParser.localName(c)) {
+      case 'start':
+      case 'left':
+        style['border-left'] = _valueOfBorder(c);
+        break;
+      case 'end':
+      case 'right':
+        style['border-right'] = _valueOfBorder(c);
+        break;
+      case 'top':
+        style['border-top'] = _valueOfBorder(c);
+        break;
+      case 'bottom':
+        style['border-bottom'] = _valueOfBorder(c);
+        break;
+    }
   }
 }

@@ -47,13 +47,15 @@ List<web.HTMLElement> _renderSections(HtmlRenderer self, DocumentElement documen
   return result;
 }
 
-List<web.Node> _renderElements(HtmlRenderer self, List<OpenXmlElement> elements, web.HTMLElement into) {
+List<web.Node> _renderElements(HtmlRenderer self, List<OpenXmlElement> elements, [web.HTMLElement? into]) {
   final result = <web.Node>[];
 
   for (final element in elements) {
     final node = self.renderElement(element);
     if (node != null) {
-      into.appendChild(node);
+      if (into != null) {
+        into.appendChild(node);
+      }
       result.add(node);
     }
   }
@@ -95,61 +97,143 @@ web.HTMLElement _createSectionContent(HtmlRenderer self, SectionProperties props
 }
 
 web.HTMLElement _renderWrapper(HtmlRenderer self, List<web.HTMLElement> children) {
-  final style = <String, String>{};
-  if (self.options.ignoreWidth) {
-    style['width'] = '100%';
-  }
   return self.hFunc({
     'tagName': 'div',
-    'className': '${self.className}-wrapper ${self.options.hideWrapperOnPrint ? 'hide-wrapper-on-print' : ''}',
-    'style': style,
+    'className': '${self.className}-wrapper',
     'children': children
   }) as web.HTMLElement;
 }
 
-List<Section> _splitBySection(HtmlRenderer self, List<OpenXmlElement> elements, SectionProperties defaultProps) {
-  final sections = <Section>[];
-  var current = <OpenXmlElement>[];
+/// Checks if an element is a page break element.
+bool _isPageBreakElement(HtmlRenderer self, OpenXmlElement elem) {
+  if (elem.type != DomType.lineBreak) return false;
+  final br = elem as WmlBreak;
 
-  for (final el in elements) {
-    if (el is WmlParagraph) {
-      final props = el.props as ParagraphProperties?;
-      if (props?.sectionProps != null) {
-        current.add(el);
-        sections.add(Section(props!.sectionProps!, current, false));
-        current = [];
-      } else {
-        current.add(el);
-      }
-    } else {
-      current.add(el);
-    }
+  if (br.breakType == 'lastRenderedPageBreak') {
+    return !self.options.ignoreLastRenderedPageBreak;
   }
 
-  if (current.isNotEmpty) {
-    sections.add(Section(defaultProps, current, false));
-  }
-
-  return sections;
+  return br.breakType == 'page';
 }
 
-List<List<Section>> _groupByPageBreaks(HtmlRenderer self, List<Section> sections) {
-  final result = <List<Section>>[];
-  var current = <Section>[];
+/// Checks if section properties change requires a page break.
+bool _isPageBreakSection(SectionProperties? prev, SectionProperties? next) {
+  if (prev == null || next == null) return false;
+  return prev.pageSize?.orientation != next.pageSize?.orientation
+      || prev.pageSize?.width != next.pageSize?.width
+      || prev.pageSize?.height != next.pageSize?.height;
+}
 
-  for (final section in sections) {
-    if (section.pageBreak && current.isNotEmpty) {
-      result.add(current);
-      current = [];
+List<Section> _splitBySection(HtmlRenderer self, List<OpenXmlElement> elements, SectionProperties defaultProps) {
+  var current = Section(SectionProperties(), [], false);
+  final result = [current];
+
+  for (final elem in elements) {
+    if (elem.type == DomType.paragraph) {
+      final p = elem as WmlParagraph;
+
+      // Check pageBreakBefore style
+      final s = self.findStyle(p.styleName);
+      if (s?.paragraphProps?.pageBreakBefore == true) {
+        current.sectProps = current.sectProps;
+        current.pageBreak = true;
+        current = Section(SectionProperties(), [], false);
+        result.add(current);
+      }
     }
-    current.add(section);
+
+    current.elements.add(elem);
+
+    if (elem.type == DomType.paragraph) {
+      final p = elem as WmlParagraph;
+      final pProps = p.props as ParagraphProperties?;
+      final sectProps = pProps?.sectionProps;
+      var pBreakIndex = -1;
+      var rBreakIndex = -1;
+
+      if (self.options.breakPages && p.children != null) {
+        for (var pi = 0; pi < p.children!.length; pi++) {
+          final r = p.children![pi];
+          if (r.children != null) {
+            for (var ri = 0; ri < r.children!.length; ri++) {
+              if (_isPageBreakElement(self, r.children![ri])) {
+                pBreakIndex = pi;
+                rBreakIndex = ri;
+                break;
+              }
+            }
+          }
+          if (pBreakIndex != -1) break;
+        }
+      }
+
+      if (sectProps != null || pBreakIndex != -1) {
+        current.sectProps = sectProps ?? current.sectProps;
+        current.pageBreak = pBreakIndex != -1;
+        current = Section(SectionProperties(), [], false);
+        result.add(current);
+      }
+
+      if (pBreakIndex != -1 && p.children != null) {
+        final breakRun = p.children![pBreakIndex];
+        final splitRun = breakRun.children != null && rBreakIndex < breakRun.children!.length - 1;
+
+        if (pBreakIndex < p.children!.length - 1 || splitRun) {
+          final children = p.children!;
+          final newParagraph = WmlParagraph()
+            ..type = p.type
+            ..styleName = p.styleName
+            ..className = p.className
+            ..cssStyle = p.cssStyle != null ? Map.from(p.cssStyle!) : null
+            ..props = p.props
+            ..children = children.sublist(pBreakIndex);
+          p.children = children.sublist(0, pBreakIndex);
+          current.elements.add(newParagraph);
+
+          if (splitRun && breakRun.children != null) {
+            final runChildren = breakRun.children!;
+            final newRun = WmlRun()
+              ..type = breakRun.type
+              ..cssStyle = breakRun.cssStyle != null ? Map.from(breakRun.cssStyle!) : null
+              ..children = runChildren.sublist(0, rBreakIndex);
+            p.children!.add(newRun);
+            breakRun.children = runChildren.sublist(rBreakIndex);
+          }
+        }
+      }
+    }
   }
 
-  if (current.isNotEmpty) {
-    result.add(current);
+  // Back-fill sectProps from the end
+  SectionProperties? currentSectProps;
+  for (var i = result.length - 1; i >= 0; i--) {
+    if (result[i].sectProps.pageSize == null && result[i].sectProps.pageMargins == null) {
+      result[i].sectProps = currentSectProps ?? defaultProps;
+    } else {
+      currentSectProps = result[i].sectProps;
+    }
   }
 
   return result;
+}
+
+List<List<Section>> _groupByPageBreaks(HtmlRenderer self, List<Section> sections) {
+  var current = <Section>[];
+  SectionProperties? prev;
+  final result = <List<Section>>[current];
+
+  for (final s in sections) {
+    current.add(s);
+
+    if (s.pageBreak || _isPageBreakSection(prev, s.sectProps)) {
+      current = <Section>[];
+      result.add(current);
+    }
+
+    prev = s.sectProps;
+  }
+
+  return result.where((x) => x.isNotEmpty).toList();
 }
 
 void _renderHeaderFooter(HtmlRenderer self, List<FooterHeaderReference> refs, SectionProperties props, int page, bool firstOfSection, web.HTMLElement into) {
@@ -189,23 +273,63 @@ void _renderHeaderFooter(HtmlRenderer self, List<FooterHeaderReference> refs, Se
   }
 }
 
-web.HTMLElement? _renderNotes(HtmlRenderer self, List<String> noteIds, Map<String, WmlFootnote> notesMap) {
-  if (noteIds.isEmpty) return null;
+web.HTMLElement? _renderNotes(HtmlRenderer self, List<String> noteIds, Map<String, WmlBaseNote> notesMap) {
+  final notes = noteIds.map((id) => notesMap[id]).where((x) => x != null).cast<WmlBaseNote>().toList();
 
-  final result = self.hFunc({'tagName': 'ol', 'className': '${self.className}-notes'}) as web.HTMLElement;
-  final notes = noteIds.map((id) => notesMap[id]).where((x) => x != null).cast<WmlFootnote>().toList();
-
-  for (final note in notes) {
-    final li = self.hFunc({
-      'tagName': 'li',
-      'id': '${self.className}-${note.noteType}-${note.id}',
-      'className': '${self.className}-note'
-    }) as web.HTMLElement;
-    _renderElements(self, note.children ?? [], li);
-    result.appendChild(li);
+  if (notes.isNotEmpty) {
+    return self.hFunc({'tagName': 'ol', 'children': _renderElements(self, notes)}) as web.HTMLElement;
   }
 
-  return result;
+  return null;
+}
+
+/// Creates an element from an OpenXmlElement using the toHTML pattern.
+web.HTMLElement _toHTML(HtmlRenderer self, OpenXmlElement elem, String ns, String tagName, [List<web.Node>? children]) {
+  final Map<String, String> style;
+  String? lang;
+  if (elem.cssStyle != null) {
+    style = Map<String, String>.from(elem.cssStyle!);
+    lang = style.remove('\$lang');
+  } else {
+    style = {};
+  }
+
+  final className = cx([elem.className, elem.styleName != null ? _processStyleName(self, elem.styleName) : null]);
+
+  final props = <String, dynamic>{
+    'ns': ns == HtmlNs.html ? null : ns,
+    'tagName': tagName,
+    'className': className.isNotEmpty ? className : null,
+    'style': style.isNotEmpty ? style : null,
+    'children': children ?? _renderElements(self, elem.children ?? []),
+  };
+
+  if (lang != null && lang.isNotEmpty) {
+    props['lang'] = lang;
+  }
+
+  return self.hFunc(props) as web.HTMLElement;
+}
+
+/// Renders a container element.
+web.Node _renderContainer(HtmlRenderer self, OpenXmlElement elem, String tagName) {
+  return self.hFunc({
+    'tagName': tagName,
+    'children': _renderElements(self, elem.children ?? [])
+  }) as web.Node;
+}
+
+/// Renders a container element with a namespace.
+web.Node _renderContainerNS(HtmlRenderer self, OpenXmlElement elem, String ns, String tagName, [Map<String, dynamic>? extraProps]) {
+  final props = <String, dynamic>{
+    'ns': ns,
+    'tagName': tagName,
+    'children': _renderElements(self, elem.children ?? []),
+  };
+  if (extraProps != null) {
+    props.addAll(extraProps);
+  }
+  return self.hFunc(props) as web.Node;
 }
 
 extension on HtmlRenderer {
@@ -242,19 +366,33 @@ extension on HtmlRenderer {
         return _renderHyperlink(this, element as WmlHyperlink);
       case DomType.smartTag:
         return _renderSmartTag(this, element as WmlSmartTag);
+      case DomType.drawing:
+        return _renderDrawing(this, element);
+      case DomType.image:
+        return _renderImage(this, element as IDomImage);
       case DomType.text:
         return _renderText(this, element as WmlText);
+      case DomType.deletedText:
+        return _renderDeletedText(this, element as WmlText);
       case DomType.tab:
         return _renderTab(this, element);
       case DomType.symbol:
         return _renderSymbol(this, element as WmlSymbol);
       case DomType.lineBreak:
         return _renderBreak(this, element as WmlBreak);
+      case DomType.noBreakHyphen:
+        return hFunc({'tagName': 'wbr'}) as web.Node;
+      case DomType.footer:
+        return _renderContainer(this, element, 'footer');
+      case DomType.header:
+        return _renderContainer(this, element, 'header');
+      case DomType.footnote:
+      case DomType.endnote:
+        return _renderContainer(this, element, 'li');
       case DomType.footnoteReference:
+        return _renderFootnoteReference(this, element as WmlNoteReference);
       case DomType.endnoteReference:
-        return _renderNoteReference(this, element as WmlNoteReference);
-      case DomType.image:
-        return _renderImage(this, element as IDomImage);
+        return _renderEndnoteReference(this, element as WmlNoteReference);
       case DomType.altChunk:
         return _renderAltChunk(this, element as WmlAltChunk);
       case DomType.mmlMath:
@@ -316,6 +454,10 @@ extension on HtmlRenderer {
       default:
         return null;
     }
+  }
+
+  IDomStyle? findStyle(String? styleName) {
+    return styleName != null && styleMap != null ? styleMap![styleName] : null;
   }
 }
 

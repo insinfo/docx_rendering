@@ -63,18 +63,36 @@ Map<String, String> _copyStyleProperties(
 
 List<web.Node> _renderDefaultStyle(HtmlRenderer self) {
   final c = self.className;
-  final styleText = '''
+
+  var wrapperStyle = '''
 .$c-wrapper { background: gray; padding: 30px; padding-bottom: 0px; display: flex; flex-flow: column; align-items: center; } 
-.$c-wrapper > section.docx { background: white; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); margin-bottom: 30px; }
-.$c { color: black; font-family: sans-serif; }
+.$c-wrapper>section.$c { background: white; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); margin-bottom: 30px; }''';
+
+  if (self.options.hideWrapperOnPrint) {
+    wrapperStyle = '@media not print { $wrapperStyle }';
+  }
+
+  var styleText = '''$wrapperStyle
+.$c { color: black; hyphens: auto; text-underline-position: from-font; }
 section.$c { box-sizing: border-box; display: flex; flex-flow: column nowrap; position: relative; overflow: hidden; }
 section.$c > article { margin-bottom: auto; z-index: 1; }
-.$c table { border-collapse: collapse; box-sizing: border-box; }
-.$c td, .$c th { box-sizing: border-box; }
-.$c p { margin: 0; padding: 0; }
-.$c span { white-space: pre-wrap; word-wrap: break-word; }
+section.$c > footer { z-index: 1; }
+.$c table { border-collapse: collapse; }
+.$c table td, .$c table th { vertical-align: top; }
+.$c p { margin: 0pt; min-height: 1em; }
+.$c span { white-space: pre-wrap; overflow-wrap: break-word; }
 .$c a { color: inherit; text-decoration: inherit; }
+.$c svg { fill: transparent; }
 ''';
+
+  if (self.options.renderComments) {
+    styleText += '''
+.$c-comment-ref { cursor: default; }
+.$c-comment-popover { display: none; z-index: 1000; padding: 0.5rem; background: white; position: absolute; box-shadow: 0 0 0.25rem rgba(0, 0, 0, 0.25); width: 30ch; }
+.$c-comment-ref:hover~.$c-comment-popover { display: block; }
+.$c-comment-author,.$c-comment-date { font-size: 0.875rem; color: #888; }
+''';
+  }
 
   return [
     self.hFunc({'tagName': 'style', 'children': [styleText]}) as web.Node
@@ -151,18 +169,20 @@ List<web.Node> _renderStyles(HtmlRenderer self, List<IDomStyle> styles) {
   ];
 }
 
-String _styleToString(String selectors, Map<String, String> values) {
+String _styleToString(String selectors, Map<String, String> values, [String? cssText]) {
   var result = '$selectors {\n';
   for (final key in values.keys) {
+    if (key.startsWith('\$')) continue;
     result += '  $key: ${values[key]};\n';
   }
+  if (cssText != null) result += cssText;
   result += '}\n';
   return result;
 }
 
 void _processNumberings(HtmlRenderer self, List<IDomNumbering> numberings) {
   for (final num in numberings.where((n) => n.pStyleName != null)) {
-    final style = self.styleMap != null ? self.styleMap![num.pStyleName!] : null;
+    final style = self.findStyle(num.pStyleName);
 
     if (style?.paragraphProps?.numbering != null) {
       style!.paragraphProps!.numbering!.level = num.level;
@@ -172,20 +192,121 @@ void _processNumberings(HtmlRenderer self, List<IDomNumbering> numberings) {
 
 Future<List<web.Node>> _renderNumbering(HtmlRenderer self, List<IDomNumbering> numberings) async {
   var styleText = '';
-  for (final num in numberings) {
-    final selector = '.${self.className}-num-${num.id}-${num.level}';
-    final listStyleType = 'none'; // Basic mapping, full mapping could be complex
+  final resetCounters = <String>[];
 
-    styleText += _styleToString(selector, {
-      'display': 'list-item',
-      'list-style-position': 'inside',
-      'list-style-type': listStyleType,
+  for (final num in numberings) {
+    final selector = 'p.${self.className}-num-${num.id}-${num.level}';
+    var listStyleType = 'none';
+
+    if (num.bullet != null) {
+      final variable = '--${self.className}-${num.bullet!.src}'.toLowerCase();
+
+      styleText += _styleToString('$selector:before', {
+        'content': "' '",
+        'display': 'inline-block',
+        'background': 'var($variable)',
+      }, num.bullet!.style);
+
+      try {
+        final imgData = await self.document.loadNumberingImage(num.bullet!.src);
+        if (imgData != null) {
+          styleText += '${self.rootSelector} { $variable: url($imgData) }\n';
+        }
+      } catch (e) {
+        if (self.options.debug) print("Can't load numbering image with src ${num.bullet!.src}");
+      }
+    } else if (num.levelText != null) {
+      final counter = '${self.className}-num-${num.id}-${num.level}';
+      final counterReset = '$counter ${num.start - 1}';
+
+      if (num.level > 0) {
+        styleText += _styleToString('p.${self.className}-num-${num.id}-${num.level - 1}', {
+          'counter-set': counterReset,
+        });
+      }
+      resetCounters.add(counterReset);
+
+      final rStyleWithContent = Map<String, String>.from(num.rStyle);
+      rStyleWithContent['content'] = _levelTextToContent(self, num.levelText!, num.suff, num.id, _numFormatToCssValue(num.format));
+      rStyleWithContent['counter-increment'] = counter;
+
+      styleText += _styleToString('$selector:before', rStyleWithContent);
+    } else {
+      listStyleType = _numFormatToCssValue(num.format);
+    }
+
+    final pStyleWithList = Map<String, String>.from(num.pStyle);
+    pStyleWithList['display'] = 'list-item';
+    pStyleWithList['list-style-position'] = 'inside';
+    pStyleWithList['list-style-type'] = listStyleType;
+
+    styleText += _styleToString(selector, pStyleWithList);
+  }
+
+  if (resetCounters.isNotEmpty) {
+    styleText += _styleToString(self.rootSelector, {
+      'counter-reset': resetCounters.join(' '),
     });
   }
 
   return [
     self.hFunc({'tagName': 'style', 'children': [styleText]}) as web.Node
   ];
+}
+
+String _levelTextToContent(HtmlRenderer self, String text, String suff, String id, String numformat) {
+  final suffMap = {
+    'tab': '\\9',
+    'space': '\\a0',
+  };
+
+  final result = text.replaceAllMapped(RegExp(r'%\d*'), (s) {
+    final lvl = int.parse(s.group(0)!.substring(1)) - 1;
+    return '" counter(${self.className}-num-$id-$lvl, $numformat) "';
+  });
+
+  return '"$result${suffMap[suff] ?? ''}"';
+}
+
+String _numFormatToCssValue(String? format) {
+  const mapping = {
+    'none': 'none',
+    'bullet': 'disc',
+    'decimal': 'decimal',
+    'lowerLetter': 'lower-alpha',
+    'upperLetter': 'upper-alpha',
+    'lowerRoman': 'lower-roman',
+    'upperRoman': 'upper-roman',
+    'decimalZero': 'decimal-leading-zero',
+    'aiueo': 'katakana',
+    'aiueoFullWidth': 'katakana',
+    'chineseCounting': 'simp-chinese-informal',
+    'chineseCountingThousand': 'simp-chinese-informal',
+    'chineseLegalSimplified': 'simp-chinese-formal',
+    'chosung': 'hangul-consonant',
+    'ideographDigital': 'cjk-ideographic',
+    'ideographTraditional': 'cjk-heavenly-stem',
+    'ideographLegalTraditional': 'trad-chinese-formal',
+    'ideographZodiac': 'cjk-earthly-branch',
+    'iroha': 'katakana-iroha',
+    'irohaFullWidth': 'katakana-iroha',
+    'japaneseCounting': 'japanese-informal',
+    'japaneseDigitalTenThousand': 'cjk-decimal',
+    'japaneseLegal': 'japanese-formal',
+    'thaiNumbers': 'thai',
+    'koreanCounting': 'korean-hangul-formal',
+    'koreanDigital': 'korean-hangul-formal',
+    'koreanDigital2': 'korean-hanja-informal',
+    'hebrew1': 'hebrew',
+    'hebrew2': 'hebrew',
+    'hindiNumbers': 'devanagari',
+    'ganada': 'hangul',
+    'taiwaneseCounting': 'cjk-ideographic',
+    'taiwaneseCountingThousand': 'cjk-ideographic',
+    'taiwaneseDigital': 'cjk-decimal',
+  };
+
+  return mapping[format] ?? format ?? 'decimal';
 }
 
 Future<List<web.Node>> _renderFontTable(HtmlRenderer self, FontTablePart fontsPart) async {
@@ -252,4 +373,3 @@ RunProperties? _mergeRunProperties(RunProperties? target, RunProperties? source)
 
   return target;
 }
-

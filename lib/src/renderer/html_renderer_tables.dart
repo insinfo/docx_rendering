@@ -14,71 +14,87 @@ void _processTable(HtmlRenderer self, WmlTable table) {
 }
 
 web.Node _renderTable(HtmlRenderer self, WmlTable table) {
-  final children = _renderElements(self, table.children ?? [], self.hFunc({'tagName': 'tbody'}) as web.HTMLElement);
+  self.tableCellPositions.add(self.currentCellPosition ?? CellPos(0, 0));
+  self.tableVerticalMerges.add(self.currentVerticalMerge ?? {});
+  self.currentVerticalMerge = {};
+  self.currentCellPosition = CellPos(0, 0);
+
+  final children = <web.Node>[];
+
+  if (table.columns != null) {
+    children.add(_renderTableColumns(self, table.columns!));
+  }
+
+  children.addAll(_renderElements(self, table.children ?? []));
+
+  self.currentVerticalMerge = self.tableVerticalMerges.removeLast();
+  self.currentCellPosition = self.tableCellPositions.removeLast();
+
+  return _toHTML(self, table, HtmlNs.html, 'table', children);
+}
+
+web.Node _renderTableColumns(HtmlRenderer self, List<WmlTableColumn> columns) {
+  final children = columns.map((x) => self.hFunc({
+    'tagName': 'col',
+    'style': {'width': x.width ?? ''}
+  })).toList();
+
   return self.hFunc({
-    'tagName': 'table',
-    'className': _processStyleName(self, table.styleName),
-    'style': table.cssStyle ?? {},
-    'children': [
-      if (table.columns != null)
-        self.hFunc({
-          'tagName': 'colgroup',
-          'children': table.columns!.map((c) => self.hFunc({
-            'tagName': 'col',
-            'style': {'width': c.width ?? ''}
-          })).toList()
-        }),
-      children[0] // tbody
-    ]
+    'tagName': 'colgroup',
+    'children': children
   }) as web.Node;
 }
 
 web.Node _renderTableRow(HtmlRenderer self, WmlTableRow row) {
-  self.currentCellPosition = CellPos(0, self.tableCellPositions.length);
-  self.tableCellPositions.add(self.currentCellPosition!);
+  self.currentCellPosition!.col = 0;
 
-  final children = _renderElements(self, row.children ?? [], self.hFunc({'tagName': 'tr'}) as web.HTMLElement);
-  final result = self.hFunc({
-    'tagName': 'tr',
-    'style': row.cssStyle ?? {},
-    'children': children
-  }) as web.Node;
+  final children = <web.Node>[];
 
-  if (row.isHeader == true) {
-    // Handling header logic if necessary
+  if (row.gridBefore != null) {
+    children.add(self.hFunc({
+      'tagName': 'td',
+      'colSpan': '${row.gridBefore}',
+      'style': {'border': 'none'}
+    }) as web.Node);
   }
 
-  return result;
+  children.addAll(_renderElements(self, row.children ?? []));
+
+  if (row.gridAfter != null) {
+    children.add(self.hFunc({
+      'tagName': 'td',
+      'colSpan': '${row.gridAfter}',
+      'style': {'border': 'none'}
+    }) as web.Node);
+  }
+
+  self.currentCellPosition!.row++;
+
+  return _toHTML(self, row, HtmlNs.html, 'tr', children);
 }
 
 web.Node _renderTableCell(HtmlRenderer self, WmlTableCell cell) {
-  final pos = self.currentCellPosition!;
-  pos.col++;
+  final result = _toHTML(self, cell, HtmlNs.html, 'td') as web.HTMLTableCellElement;
 
-  final children = _renderElements(self, cell.children ?? [], self.hFunc({'tagName': 'td'}) as web.HTMLElement);
-  final td = self.hFunc({
-    'tagName': 'td',
-    'style': cell.cssStyle ?? {},
-    'children': children
-  }) as web.HTMLTableCellElement;
+  final key = self.currentCellPosition!.col;
 
-  if (cell.span != null && cell.span! > 1) {
-    td.colSpan = cell.span!;
+  if (cell.verticalMerge != null) {
+    if (cell.verticalMerge == 'restart') {
+      self.currentVerticalMerge![key] = result;
+      result.rowSpan = 1;
+    } else if (self.currentVerticalMerge!.containsKey(key)) {
+      self.currentVerticalMerge![key]!.rowSpan += 1;
+      result.style.display = 'none';
+    }
+  } else {
+    self.currentVerticalMerge![key] = null;
   }
 
-  if (cell.verticalMerge == 'restart') {
-    if (self.currentVerticalMerge == null) {
-      self.currentVerticalMerge = {};
-      self.tableVerticalMerges.add(self.currentVerticalMerge!);
-    }
-    self.currentVerticalMerge![pos.col] = td;
-    td.rowSpan = 1;
-  } else if (cell.verticalMerge == 'continue') {
-    if (self.currentVerticalMerge != null && self.currentVerticalMerge!.containsKey(pos.col)) {
-      self.currentVerticalMerge![pos.col]!.rowSpan++;
-      td.style.display = 'none';
-    }
+  if (cell.span != null) {
+    result.colSpan = cell.span!;
   }
 
-  return td;
+  self.currentCellPosition!.col += result.colSpan;
+
+  return result;
 }
