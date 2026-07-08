@@ -11,6 +11,10 @@ class WmlRun extends OpenXmlElement {
   String? verticalAlign;
   bool? fieldRun;
 
+  /// Non-null when this run holds the *result* of a PAGE/NUMPAGES field
+  /// ('PAGE' or 'NUMPAGES'); the pagination pass rewrites its text per page.
+  String? fieldType;
+
   // RunProperties
   CssLength? fontSize;
   String? color;

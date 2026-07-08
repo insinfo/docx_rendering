@@ -69,7 +69,63 @@ OpenXmlElement _parseParagraph(DocumentParser self, dynamic node) {
     }
   }
 
+  _markFieldResults(result.children);
+
   return result;
+}
+
+/// Walks a paragraph's runs and tags the runs that hold the *result* of a
+/// PAGE / NUMPAGES complex field (the cached "2"/"15" text between the field
+/// `separate` and `end` markers). The pagination pass rewrites those per page.
+void _markFieldResults(List<OpenXmlElement>? children) {
+  if (children == null) return;
+
+  final instr = <StringBuffer>[]; // instruction text per open field
+  final separated = <bool>[]; // whether each open field passed 'separate'
+
+  for (final child in children) {
+    if (child is! WmlRun) {
+      // Fields can live inside hyperlinks etc.; recurse into containers.
+      _markFieldResults(child.children);
+      continue;
+    }
+
+    for (final rc in child.children ?? const <OpenXmlElement>[]) {
+      if (rc is WmlFieldChar) {
+        switch (rc.charType) {
+          case 'begin':
+            instr.add(StringBuffer());
+            separated.add(false);
+            break;
+          case 'separate':
+            if (separated.isNotEmpty) separated[separated.length - 1] = true;
+            break;
+          case 'end':
+            if (instr.isNotEmpty) {
+              instr.removeLast();
+              separated.removeLast();
+            }
+            break;
+        }
+      } else if (rc is WmlInstructionText && instr.isNotEmpty) {
+        instr.last.write(rc.text);
+      }
+    }
+
+    // A result run sits inside a field, past its 'separate', and is not itself
+    // a field-control run.
+    if (child.fieldRun != true &&
+        separated.isNotEmpty &&
+        separated.last &&
+        (child.children ?? const []).any((c) => c.type == DomType.text)) {
+      final code = instr.last.toString().toUpperCase();
+      if (code.contains('NUMPAGES')) {
+        child.fieldType = 'NUMPAGES';
+      } else if (code.contains('PAGE')) {
+        child.fieldType = 'PAGE';
+      }
+    }
+  }
 }
 
 void _parseParagraphProperties(

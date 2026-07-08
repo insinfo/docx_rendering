@@ -46,6 +46,35 @@ void paginate(web.Element root, {String className = 'docx'}) {
       // Never let pagination break rendering.
     }
   }
+
+  // After all sections are split, number every page globally so PAGE/NUMPAGES
+  // fields show the real page N of M instead of Word's stale cached value.
+  try {
+    _numberPages(root, className);
+  } catch (_) {}
+}
+
+/// Rewrites the text of every PAGE / NUMPAGES field result (marked with
+/// `data-docx-field`) to the real page index and total page count.
+void _numberPages(web.Element root, String className) {
+  final sections = root.querySelectorAll('section.$className');
+  final total = sections.length;
+  if (total == 0) return;
+
+  for (var i = 0; i < total; i++) {
+    final sec = sections.item(i);
+    if (sec == null) continue;
+    _setFieldText(sec as web.Element, 'PAGE', '${i + 1}');
+    _setFieldText(sec, 'NUMPAGES', '$total');
+  }
+}
+
+void _setFieldText(web.Element section, String field, String value) {
+  final els = section.querySelectorAll('[data-docx-field="$field"]');
+  for (var j = 0; j < els.length; j++) {
+    final el = els.item(j);
+    if (el != null) el.textContent = value;
+  }
 }
 
 void _paginateSection(web.HTMLElement section) {

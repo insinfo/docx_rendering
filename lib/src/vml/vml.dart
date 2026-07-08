@@ -18,6 +18,9 @@ class VmlElement extends OpenXmlElementBase {
   String? wrapType;
   ImageHref? imageHref;
 
+  /// CSS border for a stroked text box (SVG `<g>` alone paints no outline).
+  String? borderCss;
+
   VmlElement() : super(type: DomType.vmlElement);
 }
 
@@ -109,6 +112,19 @@ VmlElement? parseVmlElement(dynamic elem, DocumentParser parser) {
         }
         break;
     }
+  }
+
+  // A VML shape is stroked by default (unless stroked="f"). For a text box
+  // (a shape containing a <v:textbox>) that means a visible border, which the
+  // SVG <g> alone would not paint — capture it as CSS for the renderer.
+  if (xml.localName(elem) == 'shape' &&
+      xml.attr(elem, 'stroked') != 'f' &&
+      (result.children?.any(
+              (c) => c is VmlElement && c.tagName == 'foreignObject') ??
+          false)) {
+    final color = xml.attr(elem, 'strokecolor') ?? '#000000';
+    final weight = xml.attr(elem, 'strokeweight') ?? '0.75pt';
+    result.borderCss = '$weight solid $color';
   }
 
   return result;

@@ -143,16 +143,34 @@ Future<void> _renderOne(
   // Capture stats about what was rendered.
   final stats = await page.evaluate('''() => {
     const c = document.getElementById('container');
+    const ps = Array.from(c.querySelectorAll('article > p'));
+    const lh = {};   // computed line-height -> count
+    const ff = {};   // font-family (first) -> count
+    let empty = 0, emptyH = 0;
+    for (const p of ps) {
+      const cs = getComputedStyle(p);
+      const k = cs.lineHeight;
+      lh[k] = (lh[k] || 0) + 1;
+      if (!p.textContent.trim()) { empty++; emptyH += p.getBoundingClientRect().height; }
+      const span = p.querySelector('span');
+      if (span) { const f = getComputedStyle(span).fontFamily.split(',')[0]; ff[f] = (ff[f]||0)+1; }
+    }
     return {
       pages: c.querySelectorAll('section.docx').length,
       paragraphs: c.querySelectorAll('p').length,
       tables: c.querySelectorAll('table').length,
       images: c.querySelectorAll('img').length,
       imagesLoaded: Array.from(c.querySelectorAll('img')).filter(i => i.complete && i.naturalWidth > 0).length,
+      pageFields: Array.from(c.querySelectorAll('[data-docx-field="PAGE"]')).slice(0,3).map(e=>e.textContent),
+      numFields: Array.from(c.querySelectorAll('[data-docx-field="NUMPAGES"]')).slice(0,2).map(e=>e.textContent),
+      lineHeights: lh, fonts: ff, emptyParas: empty, emptyParaTotalH: Math.round(emptyH),
     };
   }''');
   stdout.writeln('   pages=${stats['pages']} paragraphs=${stats['paragraphs']} '
       'tables=${stats['tables']} images=${stats['imagesLoaded']}/${stats['images']} loaded');
+  stdout.writeln('   PAGE=${stats['pageFields']} NUMPAGES=${stats['numFields']}');
+  stdout.writeln('   lineHeights=${stats['lineHeights']}');
+  stdout.writeln('   fonts=${stats['fonts']}  emptyParas=${stats['emptyParas']} (Σh=${stats['emptyParaTotalH']}px)');
 
   // Full-page screenshot.
   final png = await page.screenshot(fullPage: true, format: ScreenshotFormat.png);

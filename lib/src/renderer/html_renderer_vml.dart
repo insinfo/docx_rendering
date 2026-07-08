@@ -14,7 +14,16 @@ web.Node _renderVmlElement(HtmlRenderer self, VmlElement elem) {
   if (elem.cssStyleText != null) {
     // Browsers ignore VML `mso-*` positioning hints, so a raw VML style string
     // leaves floating shapes/textboxes mispositioned. Translate it to real CSS.
-    containerProps['style'] = _translateVmlStyle(elem.cssStyleText!);
+    final style = _translateVmlStyle(elem.cssStyleText!);
+    if (elem.borderCss != null) {
+      // Border only: the authored box height fits the text exactly, so adding
+      // padding/box-sizing would shrink the content area and clip the last line
+      // (the foreignObject clips to its bounds). The border draws outside.
+      style['border'] = elem.borderCss!;
+    }
+    containerProps['style'] = style;
+  } else if (elem.borderCss != null) {
+    containerProps['style'] = {'border': elem.borderCss!};
   }
   
   final container = self.hFunc(containerProps) as web.SVGElement;

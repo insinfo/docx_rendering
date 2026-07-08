@@ -80,11 +80,13 @@ paginação.
 | Tabelas multi-página (TR) | ✅ Fiel | Bordas, `colspan` (SUBTOTAL), merge vertical, larguras de coluna, quebra de célula e negrito corretos |
 | Imagens (brasão, logos) | ✅ Carregam | `images loaded = 2/2` (ETP), `5/5` (TR); base64 embutido OK |
 | Fontes / cores de tema | ✅ OK | Variáveis `--docx-*-color`, mapeamento de fontes de estilo aplicados |
-| **Caixa VML "Continuação de Processo"** | ❌ **Falha** | Posicionada errada — sobrepõe brasão/endereço (ETP) ou é cortada à direita (TR); sem borda |
+| **Caixa VML "Continuação de Processo"** | ✅ Corrigido (F1+F2) | Reposicionada (F1) e agora **com borda** (F2), envolvendo as 4 linhas, igual ao Word |
 | **Composição do cabeçalho (objetos flutuantes)** | ✅ Corrigido (F1) | Caixa VML reposicionada; layout horizontal fiel nos dois docs |
-| **Paginação dinâmica** | ✅ v3 (F3+F10+F11) | Cabeçalho/rodapé por página; **tabelas** quebradas linha-a-linha (repetindo `w:tblHeader`); **parágrafos longos** quebrados no limite da linha (sem cortar palavra). ETP: 1 → 19 (Word 15); TR: 3 → 158 (Word 140). O resíduo de contagem é altura de conteúdo (métrica de fonte, F8), não empacotamento |
-| Borda de textbox / autoshapes VML | ❌ Falta | `<v:shape>` vira `<g>` sem retângulo de contorno; stroke não desenha |
-| Rodapé (logos GOVTIC/DIGITAL) | ⚠️ Verificar | Imagens carregam; conferir alinhamento horizontal dos 3 logos |
+| **Paginação dinâmica** | ✅ v3 (F3+F10+F11) | Cabeçalho/rodapé por página; **tabelas** quebradas linha-a-linha (repetindo `w:tblHeader`); **parágrafos longos** quebrados no limite da linha (sem cortar palavra). ETP: 1 → 19; TR: 3 → 158 |
+| **Número de página (`PAGE`/`NUMPAGES`)** | ✅ Corrigido (F12) | Antes "Página 2 \| 15" repetido (cache do Word); agora "Página 1 \| 19", "Página 2 \| 19"… recalculado por página |
+| Borda de textbox / autoshapes VML | ✅ Corrigido (F2) | Texto-boxes VML *stroked* por padrão ganham borda CSS na `<svg>` |
+| Contagem de páginas vs Word | ✅ Investigado (F8) | Métricas já fiéis (Arial 12pt, entrelinha 1,15 = 18,4px); o "15" do cache era de versão antiga/menor — sem correção necessária |
+| Rodapé (logos GOVTIC/DIGITAL) | ✅ OK | 3 logos + endereço + número de página renderizam e repetem por página |
 
 ### Causa-raiz dos defeitos principais
 
@@ -135,15 +137,18 @@ nos dois documentos.*
   sobrepor brasão/endereço, sem corte.
 - **Status:** ✅ **implementado nesta iteração** (ver §7).
 
-**F2. Borda/contorno de autoshapes e textboxes VML.**
-- **Causa:** `<v:shape>`/`<v:rect>` viram `<g>`/`<rect>` mas o textbox
-  (`foreignObject`) não recebe contorno; stroke em `<g>` não pinta.
-- **Abordagem:** quando o shape tiver stroke (ou stroke default do VML, salvo
-  `stroked="f"`), aplicar `border` via CSS no conteúdo do `foreignObject`
-  (ou inserir `<rect fill="none" stroke=… width="100%" height="100%">` como
-  primeiro filho). Ler cor/espessura de `<v:stroke>`/atributos `strokecolor`,
-  `strokeweight`.
-- **Risco:** Médio — precisa distinguir shapes com/sem borda.
+**F2. Borda/contorno de textboxes VML** — ✅ **implementado**.
+- **Causa:** `<v:shape>` vira `<g>` (grupo SVG, que não pinta contorno); o
+  textbox (`foreignObject`) ficava sem borda.
+- **Abordagem adotada:** no parser (`vml.dart`), um `<v:shape>` que contém um
+  `<v:textbox>` e **não** tem `stroked="f"` é *stroked* por padrão no VML →
+  capturamos `borderCss` (`strokeweight` ou 0.75pt, `strokecolor` ou #000000).
+  No renderer (`html_renderer_vml.dart`), aplicamos `border` via CSS na `<svg>`.
+  Só a borda (sem padding/box-sizing): a altura autoral da caixa comporta as 4
+  linhas exatas; padding encolheria a área e o `foreignObject` cortaria a última.
+- **Resultado:** a caixa "Continuação de Processo" fica com a borda envolvendo
+  as 4 linhas, idêntica ao Word.
+- **Risco:** Baixo — restrito a text-boxes VML.
 
 ### TIER 2 — Estrutural
 

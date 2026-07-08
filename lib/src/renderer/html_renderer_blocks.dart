@@ -45,6 +45,11 @@ web.Node? _renderRun(HtmlRenderer self, WmlRun run) {
     (result as web.HTMLElement).id = run.id!;
   }
 
+  // Mark PAGE/NUMPAGES field results so the pagination pass can renumber them.
+  if (run.fieldType != null) {
+    result.setAttribute('data-docx-field', run.fieldType!);
+  }
+
   return result;
 }
 
