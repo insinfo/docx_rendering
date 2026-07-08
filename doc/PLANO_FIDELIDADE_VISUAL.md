@@ -57,11 +57,19 @@ dart run test/render_harness.dart resources/PGCTIC1_-_ETP_-_Sistema_de_Gestão_P
 > Estatísticas impressas por documento: nº de páginas, parágrafos, tabelas e
 > imagens carregadas — servem como *smoke test* numérico.
 
-### Próximos incrementos do harness (ver Fase 4)
+Além das estatísticas, o harness imprime **métricas de fonte/entrelinha** (para
+diagnosticar altura de conteúdo) e verifica os campos `PAGE`/`NUMPAGES`. Com
+`FIND="texto" dart run test/render_harness.dart …` ele recorta a região ao redor
+do primeiro elemento que contém o texto — útil para comparar uma tabela/rodapé
+específico contra a página correspondente do PDF de referência.
 
-- Recortes por região (cabeçalho, rodapé, cada tabela) para diffs focados.
-- Diff de imagem pixel-a-pixel contra um baseline aprovado (detectar regressão).
-- Baseline "verdade" a partir de PNGs exportados pelo próprio Word.
+### Próximos incrementos do harness (ver Fase 5)
+
+- ✅ Baseline "verdade" a partir do PDF exportado do Word (per-página em
+  `resources/<doc>/…-NN.png`, commitado) — já usado para validar F8/F5/F9.
+- ✅ Recorte por região via `FIND=` (cabeçalho, rodapé, tabela específica).
+- Diff de imagem pixel-a-pixel `test/output` × `resources/<doc>/*.png` para
+  detectar regressão automaticamente.
 
 ---
 
@@ -214,8 +222,10 @@ nos dois documentos.*
 
 ### TIER 3 — Polimento
 
-- **F5.** Rodapé: alinhamento horizontal dos logos (GOVTIC/DIGITAL/Rio das
-  Ostras) e do número de página `Página X | Y`.
+- **F5. Rodapé** — ✅ **verificado, já fiel**. Comparação direta contra o PDF de
+  referência (ETP pág. 1 e TR pág. 139): os logos (GOVTIC + Secretaria / RIO DAS
+  OSTRAS DIGITAL / PREFEITURA RIO DAS OSTRAS), o endereço, a URL e o número de
+  página aparecem alinhados como no Word, repetidos por página. Sem correção.
 - **F6.** Precisão de recuo/espaçamento de listas (comparar `margin-left`/
   `text-indent` com o Word).
 - **F7.** Tab stops (`w:tabs`) — a feature é `experimental` e hoje não computa
@@ -234,7 +244,12 @@ nos dois documentos.*
   total ainda bate (19=19)**; só os pontos de quebra por página diferem um pouco.
   Casar o modelo de line-box do Word (auto/single) aproximaria as quebras, mas é
   arriscado e não muda a contagem. Baixa prioridade.
-- **F9.** Cores/sombreamento de células (`w:shd`) em cabeçalhos de tabela.
+- **F9. Sombreamento de células (`w:shd`)** — ✅ **verificado, já fiel**. O
+  parser aplica `w:shd fill` como `background-color` (via `parseDefaultProperties`
+  no `tcPr`) e `colorAttr` prefixa `#`. No render do TR aparecem todas as cores:
+  `#FFFFFF`×1308, `#FFFF00`×4, `#FF0000`×2, `#E8E8E8`, `#00B050`, e caixas de nota
+  `#FFFFCC`/`#E1DFDD`. As tabelas de requisitos (linhas-cabeçalho "Diário de
+  Obras" etc.) são brancas no Word também — nada faltando. Sem correção.
 
 ---
 

@@ -190,6 +190,29 @@ Future<void> _renderOne(
   );
   File('${outputDir.path}/${name}__mid.png').writeAsBytesSync(midCrop);
 
+  // Optional: crop around the first element whose text contains FIND (env var),
+  // for comparing a specific region against the reference PDF pages.
+  final find = Platform.environment['FIND'];
+  if (find != null && find.isNotEmpty) {
+    final top = await page.evaluate('''(needle) => {
+      const els = Array.from(document.querySelectorAll('#container *'));
+      const el = els.find(e => e.children.length === 0 && e.textContent.includes(needle));
+      if (!el) return -1;
+      const r = el.getBoundingClientRect();
+      return Math.max(0, r.top + window.scrollY - 120);
+    }''', args: [find]);
+    if (top is num && top >= 0) {
+      final findCrop = await page.screenshot(
+        format: ScreenshotFormat.png,
+        clip: Rectangle(0, top.toInt(), 1200, 1500),
+      );
+      File('${outputDir.path}/${name}__find.png').writeAsBytesSync(findCrop);
+      stdout.writeln('   FIND "$find" -> crop at y=${top.toInt()}');
+    } else {
+      stdout.writeln('   FIND "$find" not found');
+    }
+  }
+
   // HTML dump of the rendered container (for structural inspection).
   final html = await page.evaluate('''() => document.getElementById('container').outerHTML''');
   File('${outputDir.path}/$name.html').writeAsStringSync(html as String);
