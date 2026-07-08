@@ -21,6 +21,13 @@ void main() {
         
         // Use docx_rendering to render
         renderAsync(bytes, container, null, null).then((_) {
+          // Approximate dynamic pagination: split the tall page into A4 pages,
+          // repeating header/footer (see src/renderer/pagination.dart).
+          try {
+            paginate(container);
+          } catch (e) {
+            print('Pagination error: $e');
+          }
           print('Render complete!');
         }).catchError((e) {
           print('Render error: $e');

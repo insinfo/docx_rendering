@@ -2,3 +2,13 @@
 pubspec.lock
 
 errors.txt
+
+# Generated web build artifacts (produced by `dart compile js` / build_runner)
+example/web/main.dart.js*
+web/main.dart.js*
+
+# Render harness output (screenshots / HTML dumps)
+test/output/
+
+# Large unrelated external clone
+referencias/pdf.js/

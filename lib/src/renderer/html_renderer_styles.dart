@@ -77,6 +77,7 @@ List<web.Node> _renderDefaultStyle(HtmlRenderer self) {
 section.$c { box-sizing: border-box; display: flex; flex-flow: column nowrap; position: relative; overflow: hidden; }
 section.$c > article { margin-bottom: auto; z-index: 1; }
 section.$c > footer { z-index: 1; }
+section.$c > header, section.$c > footer { position: relative; }
 .$c table { border-collapse: collapse; }
 .$c table td, .$c table th { vertical-align: top; }
 .$c p { margin: 0pt; min-height: 1em; }

@@ -12,7 +12,9 @@ web.Node _renderVmlElement(HtmlRenderer self, VmlElement elem) {
     'tagName': 'svg',
   };
   if (elem.cssStyleText != null) {
-    containerProps['style'] = elem.cssStyleText!;
+    // Browsers ignore VML `mso-*` positioning hints, so a raw VML style string
+    // leaves floating shapes/textboxes mispositioned. Translate it to real CSS.
+    containerProps['style'] = _translateVmlStyle(elem.cssStyleText!);
   }
   
   final container = self.hFunc(containerProps) as web.SVGElement;
@@ -69,6 +71,84 @@ web.SVGElement _renderVmlChildElement(HtmlRenderer self, VmlElement elem) {
   }
 
   return result;
+}
+
+/// Translates a raw VML shape `style` string into browser-usable CSS.
+///
+/// VML positions floating shapes with `mso-position-horizontal/vertical`
+/// (+ `-relative`) keywords that browsers ignore, so the raw string leaves the
+/// shape mispositioned (e.g. a top-right process box overlapping the header).
+/// This parses the declarations, drops the VML-only noise (`mso-*`, `v-*`,
+/// `*-percent`) and turns the keyword alignments into real CSS offsets. The
+/// offsets anchor to the nearest positioned ancestor — the header/footer is
+/// made `position: relative` (see `_renderDefaultStyle`) so `right:0` aligns to
+/// the content area (between margins), matching Word.
+Map<String, String> _translateVmlStyle(String raw) {
+  final map = <String, String>{};
+  for (final decl in raw.split(';')) {
+    final i = decl.indexOf(':');
+    if (i < 0) continue;
+    final key = decl.substring(0, i).trim().toLowerCase();
+    final value = decl.substring(i + 1).trim();
+    if (key.isEmpty || value.isEmpty) continue;
+    map[key] = value;
+  }
+
+  final hPos = map['mso-position-horizontal'];
+  final vPos = map['mso-position-vertical'];
+
+  // Drop declarations the browser can't render.
+  map.removeWhere((k, _) =>
+      k.startsWith('mso-') || k.startsWith('v-') || k.endsWith('-percent'));
+
+  // A shape carrying mso-position hints is a floating object.
+  if (hPos != null || vPos != null) {
+    map['position'] = 'absolute';
+  }
+
+  switch (hPos) {
+    case 'right':
+    case 'outside':
+      map['right'] = '0';
+      map.remove('left');
+      map.remove('margin-left');
+      break;
+    case 'left':
+    case 'inside':
+      map['left'] = '0';
+      map.remove('right');
+      map.remove('margin-left');
+      break;
+    case 'center':
+      map['left'] = '0';
+      map['right'] = '0';
+      map['margin-left'] = 'auto';
+      map['margin-right'] = 'auto';
+      break;
+    // 'absolute' / null: keep margin-left as the horizontal offset.
+  }
+
+  switch (vPos) {
+    case 'top':
+    case 'inside':
+      map['top'] = '0';
+      map.remove('margin-top');
+      break;
+    case 'bottom':
+    case 'outside':
+      map['bottom'] = '0';
+      map.remove('margin-top');
+      break;
+    case 'center':
+      map['top'] = '0';
+      map['bottom'] = '0';
+      map['margin-top'] = 'auto';
+      map['margin-bottom'] = 'auto';
+      break;
+    // 'absolute' / null: keep margin-top as the vertical offset.
+  }
+
+  return map;
 }
 
 web.SVGElement _createSvgElement(HtmlRenderer self, String tagName, [Map<String, dynamic>? props, List<dynamic>? children]) {

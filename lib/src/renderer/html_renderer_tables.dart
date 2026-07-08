@@ -70,7 +70,13 @@ web.Node _renderTableRow(HtmlRenderer self, WmlTableRow row) {
 
   self.currentCellPosition!.row++;
 
-  return _toHTML(self, row, HtmlNs.html, 'tr', children);
+  final result = _toHTML(self, row, HtmlNs.html, 'tr', children);
+  // Mark repeatable header rows (w:tblHeader) so the pagination pass can repeat
+  // them at the top of each continuation of a table split across pages.
+  if (row.isHeader == true) {
+    result.setAttribute('data-docx-header', '');
+  }
+  return result;
 }
 
 web.Node _renderTableCell(HtmlRenderer self, WmlTableCell cell) {
