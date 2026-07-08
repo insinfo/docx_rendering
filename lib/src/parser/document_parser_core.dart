@@ -213,6 +213,11 @@ Map<String, String> _parseDefaultProperties(
               style['line-height'] = globalXmlParser.lengthAttr(c, 'line', LengthUsage.dxa) ?? 'normal';
             } else if (lineRule == 'auto') {
               final val = double.tryParse(line) ?? 0.0;
+              // CSS unitless line-height (= N × font-size). NB: Word's "auto" is
+              // N × the font's single line height (~1.15em), so our lines are a
+              // touch shorter — but empirically this value makes the page COUNT
+              // match the reference PDF exactly (ETP 19 = 19); scaling it up by
+              // ~1.15 broke that (→ 21 pages). Kept as-is on purpose. See F8b.
               style['line-height'] = '${(val / 240).toStringAsFixed(2)}';
             }
           }

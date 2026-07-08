@@ -285,12 +285,18 @@ nos dois documentos.*
   **Prova definitiva:** o PDF de referência do ETP (`resources/<doc>/…-01..19.png`)
   tem **19 páginas** e rodapé "Página 1 | 19" — **igual ao nosso render**. O "15"
   era `NUMPAGES` em cache de uma versão antiga. Forçar 15 seria *sub-renderizar*.
-- **F8b (refinamento fino, opcional).** No ETP, nossa página 1 empacota um pouco
-  *mais* que o PDF (termina na seção 4; o PDF termina na 3) — as linhas do Word
-  são marginalmente mais altas que o `line-height:1,15` do CSS. A **contagem
-  total ainda bate (19=19)**; só os pontos de quebra por página diferem um pouco.
-  Casar o modelo de line-box do Word (auto/single) aproximaria as quebras, mas é
-  arriscado e não muda a contagem. Baixa prioridade.
+- **F8b (tentado, REVERTIDO — contraproducente).** No ETP, nossa página 1
+  empacota um pouco *mais* que o PDF (termina na seção 4; o PDF na 3). Hipótese:
+  as linhas do Word (`auto` = N × entrelinha simples ≈ 1,15em) são mais altas
+  que o `line-height:1,15` do CSS (= N × font-size). **Experimento:** multipliquei
+  a entrelinha `auto` por 1,15 (→ 18,4px vira 21,15px). **Resultado medido:** o
+  ETP foi de 19 → **21 páginas**, *divergindo* do PDF (19). Ou seja, o valor
+  atual (1,15) já faz a **contagem bater exatamente com o PDF**; aumentá-lo
+  quebra isso. A diferença de quebra na página 1 é **local**, não um erro global
+  de entrelinha. **Mantido o valor atual** (comentário no código explica o porquê
+  para ninguém "consertar" de novo). Fechar as quebras locais exigiria replicar o
+  modelo de line-box do Word por-linha (muito complexo, alto risco) sem ganho de
+  contagem — não vale a pena.
 - **F9. Sombreamento de células (`w:shd`)** — ✅ **verificado, já fiel**. O
   parser aplica `w:shd fill` como `background-color` (via `parseDefaultProperties`
   no `tcPr`) e `colorAttr` prefixa `#`. No render do TR aparecem todas as cores:
