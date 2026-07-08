@@ -73,9 +73,9 @@ class DocumentParser {
 
   Map<String, String> parseDefaultProperties(
           dynamic node, Map<String, String>? style,
-          [List<OpenXmlElement>? childs,
+          [Map<String, String>? childStyle,
           bool Function(dynamic)? handler]) =>
-      _parseDefaultProperties(this, node, style, childs, handler);
+      _parseDefaultProperties(this, node, style, childStyle, handler);
 
   // Numbering parsing
   List<IDomNumbering> parseNumberingFile(dynamic node) =>

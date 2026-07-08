@@ -79,7 +79,7 @@ List<OpenXmlElement> _parseBodyElements(DocumentParser self, dynamic element) {
 
 Map<String, String> _parseDefaultProperties(
     DocumentParser self, dynamic node, Map<String, String>? style,
-    [List<OpenXmlElement>? childs, bool Function(dynamic)? handler]) {
+    [Map<String, String>? childStyle, bool Function(dynamic)? handler]) {
   style ??= {};
 
   for (final c in globalXmlParser.elements(node)) {
@@ -143,6 +143,13 @@ Map<String, String> _parseDefaultProperties(
         _parseFont(c, style);
         break;
       case 'tblBorders':
+        // A table's borders (outer + insideH/insideV) are applied to every
+        // *cell* (via childStyle -> cellStyle), so border-collapse draws the
+        // full grid — the internal lines, not just an outer box. This mirrors
+        // docxjs; without it, tables that rely on table-level borders (instead
+        // of per-cell tcBorders) render with no internal rules.
+        _parseBorderProperties(c, childStyle ?? style);
+        break;
       case 'pBdr':
       case 'tcBorders':
         _parseBorderProperties(c, style);
@@ -267,6 +274,19 @@ void _parseBorderProperties(dynamic node, Map<String, String> style) {
         break;
       case 'bottom':
         style['border-bottom'] = _valueOfBorder(c);
+        break;
+      // Table inside borders: applied to every cell (this runs on the table's
+      // cellStyle), so insideH becomes each cell's top/bottom rule and insideV
+      // its left/right rule — border-collapse then draws the internal grid.
+      case 'insideH':
+        final h = _valueOfBorder(c);
+        style['border-top'] = h;
+        style['border-bottom'] = h;
+        break;
+      case 'insideV':
+        final v = _valueOfBorder(c);
+        style['border-left'] = v;
+        style['border-right'] = v;
         break;
     }
   }

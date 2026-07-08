@@ -144,7 +144,12 @@ List<web.Node> _renderStyles(HtmlRenderer self, List<IDomStyle> styles) {
       var linkedStyle = stylesMap[style.linked!];
 
       if (linkedStyle != null) {
-        subStyles = subStyles.toList()..addAll(linkedStyle.styles);
+        // Emit the linked (character) style's rules FIRST so the main style's
+        // own properties win on conflict (CSS is last-wins at equal
+        // specificity), matching Word — otherwise a stale color/format in the
+        // linked char style overrides the paragraph style (e.g. a black title
+        // rendered red because its linked char style kept the base red).
+        subStyles = [...linkedStyle.styles, ...subStyles];
       } else if (self.options.debug) {
         print("Can't find linked style ${style.linked}");
       }

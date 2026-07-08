@@ -12,7 +12,8 @@ WmlTable _parseTable(DocumentParser self, dynamic node) {
         self.parseTableColumns(el, result);
         break;
       case 'tblPr':
-        self.parseDefaultProperties(el, result.cssStyle = {});
+        // Pass a cellStyle map so table-level borders land on every cell.
+        self.parseDefaultProperties(el, result.cssStyle = {}, result.cellStyle = {});
         result.styleName = globalXmlParser.elementAttr(el, 'tblStyle', 'val');
         break;
     }

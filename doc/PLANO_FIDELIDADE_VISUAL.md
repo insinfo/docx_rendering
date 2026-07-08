@@ -95,6 +95,8 @@ paginação.
 | Borda de textbox / autoshapes VML | ✅ Corrigido (F2) | Texto-boxes VML *stroked* por padrão ganham borda CSS na `<svg>` |
 | Contagem de páginas vs Word | ✅ Confirmado (F8) | **ETP: 19 páginas = PDF de referência 19 páginas (bate exato!)**. O "15" era cache obsoleto. TR: 158 vs PDF 140 (~13% de resíduo, ligado a tabelas). PDFs/PNGs de referência em `resources/<doc>/` |
 | Rodapé (logos GOVTIC/DIGITAL) | ✅ OK | 3 logos + endereço + número de página renderizam e repetem por página |
+| **Títulos pretos saindo vermelhos** | ✅ Corrigido (F13) | Estilo de parágrafo com override preto (`w:color auto`) era sobreposto pelo vermelho do estilo de caractere *linked*; corrigida a ordem (main vence) |
+| **Linhas internas de tabela ausentes** | ✅ Corrigido (F14) | `tblBorders` (inclui `insideH`/`insideV`) agora vai para o `cellStyle` → toda célula recebe borda → grade completa (não só a caixa externa) |
 
 ### Causa-raiz dos defeitos principais
 
@@ -123,6 +125,37 @@ Ordenado por (impacto visual ÷ risco/esforço). Cada item: **problema → causa
 abordagem → risco**.
 
 ### TIER 1 — Alto impacto, escopo isolado
+
+**F13. Títulos pretos renderizados em vermelho** — ✅ **implementado** (validado
+contra o PDF: "Memória de Cálculo" agora preto).
+- **Causa:** um estilo de parágrafo (ex.: `Nvel1-SemNum0`) que sobrescreve a cor
+  para preto (`<w:color w:val="auto"/>`, herdando de um base vermelho) tem um
+  **estilo de caractere *linked*** que ficou vermelho. O renderer emitia as
+  regras CSS do estilo *linked* **depois** das do estilo principal → como CSS é
+  "último vence" na mesma especificidade, o vermelho ganhava.
+- **Abordagem:** em `_renderStyles`, emitir as regras do estilo *linked*
+  **antes** das do principal (`[...linkedStyle.styles, ...subStyles]`), para o
+  estilo principal vencer o conflito (como no Word).
+- **Risco:** Baixo — estritamente mais correto (principal vence, linked preenche
+  lacunas). ETP/TR sem regressão.
+
+**F14. Linhas internas de tabela ausentes** — ✅ **implementado** (validado
+contra o PDF pág. 6).
+- **Causa:** um `tblBorders` no nível da tabela (comum quando as células não têm
+  `tcBorders` próprios) era aplicado ao **elemento `<table>`** (só caixa
+  externa). O `table.cellStyle`, que o docxjs usa para levar a borda a **cada
+  célula**, nunca era populado (o 3º parâmetro de `parseDefaultProperties` fora
+  portado como `List` e ignorado).
+- **Abordagem:** 3º parâmetro vira `childStyle` (Map); `tblBorders` roteia para
+  `childStyle ?? style`; `_parseTable` passa `cellStyle`; `_parseBorderProperties`
+  passa a entender `insideH`/`insideV` (→ topo/baixo e esq./dir. das células).
+  `_processTable` já copia o `cellStyle` para células sem borda própria → grade
+  completa via `border-collapse`.
+- **Nota:** o arquivo TR é uma cópia *Recuperação Automática*; alguns atributos
+  podem ter sido perdidos na recuperação, mas as tabelas com `tblBorders` agora
+  batem com o PDF.
+- **Risco:** Baixo — células com `tcBorders` próprios têm precedência (cópia só
+  preenche o que falta); GRUPO/requisitos sem regressão.
 
 **F1. Posicionamento da caixa VML (textbox flutuante)** — *defeito nº 1, aparece
 nos dois documentos.*
