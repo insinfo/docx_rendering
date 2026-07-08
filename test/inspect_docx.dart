@@ -1,8 +1,7 @@
 import 'dart:io';
-import 'dart:typed_data';
-import 'package:docx_rendering/src/docx_preview.dart';
 import 'package:docx_rendering/src/document/dom.dart';
 import 'package:docx_rendering/src/document/paragraph.dart';
+import 'package:docx_rendering/src/document/style.dart';
 import 'package:docx_rendering/src/document_parser.dart';
 import 'package:docx_rendering/src/word_document.dart';
 
@@ -20,11 +19,13 @@ void main() async {
   for (final el in body.children!) {
     if (el is WmlParagraph) {
       count++;
-      final text = el.children!.map((c) => c.children?.map((gc) => gc.type == DomType.text ? (gc as WmlText).value : '').join('') ?? '').join('');
-      
+      final text = el.children!.map((c) => c.children?.map((gc) => gc.type == DomType.text ? (gc as WmlText).text : '').join('') ?? '').join('');
+
       final propsNum = (el.props as ParagraphProperties?)?.numbering;
       final styleName = el.styleName;
-      final style = doc.stylesPart?.styles.firstWhere((s) => s.id == styleName, orElse: () => IDomStyle(id: ''));
+      final style = doc.stylesPart?.styles
+          .cast<IDomStyle?>()
+          .firstWhere((s) => s?.id == styleName, orElse: () => null);
       final styleNum = style?.paragraphProps?.numbering;
       
       print('Paragraph $count: "$text"');

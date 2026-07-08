@@ -85,7 +85,7 @@ paginação.
 | **Paginação dinâmica** | ✅ v3 (F3+F10+F11) | Cabeçalho/rodapé por página; **tabelas** quebradas linha-a-linha (repetindo `w:tblHeader`); **parágrafos longos** quebrados no limite da linha (sem cortar palavra). ETP: 1 → 19; TR: 3 → 158 |
 | **Número de página (`PAGE`/`NUMPAGES`)** | ✅ Corrigido (F12) | Antes "Página 2 \| 15" repetido (cache do Word); agora "Página 1 \| 19", "Página 2 \| 19"… recalculado por página |
 | Borda de textbox / autoshapes VML | ✅ Corrigido (F2) | Texto-boxes VML *stroked* por padrão ganham borda CSS na `<svg>` |
-| Contagem de páginas vs Word | ✅ Investigado (F8) | Métricas já fiéis (Arial 12pt, entrelinha 1,15 = 18,4px); o "15" do cache era de versão antiga/menor — sem correção necessária |
+| Contagem de páginas vs Word | ✅ Confirmado (F8) | **ETP: 19 páginas = PDF de referência 19 páginas (bate exato!)**. O "15" era cache obsoleto. TR: 158 vs PDF 140 (~13% de resíduo, ligado a tabelas). PDFs/PNGs de referência em `resources/<doc>/` |
 | Rodapé (logos GOVTIC/DIGITAL) | ✅ OK | 3 logos + endereço + número de página renderizam e repetem por página |
 
 ### Causa-raiz dos defeitos principais
@@ -160,16 +160,27 @@ nos dois documentos.*
   páginas A4 reais — a mesma técnica das extensões de paginação do Tiptap
   clonadas em `referencias/` (medir `getBoundingClientRect`, acumular, quebrar
   no overflow). Ver `lib/src/renderer/pagination.dart` e §7.
-- **Resultado:** ETP 1 → **19 páginas** (Word: 15); cabeçalho **e** rodapé
-  repetem em cada página; conteúdo flui de página em página.
+- **Resultado:** ETP 1 → **19 páginas** (= PDF de referência: **19** ✓);
+  cabeçalho **e** rodapé repetem em cada página; conteúdo flui de página em página.
 - **Risco:** Baixo — opt-in (chamada explícita a `paginate()`); qualquer erro de
   medição é engolido sem quebrar a renderização base.
 
 **F4. Cabeçalho/rodapé por página** — ✅ coberto por F3 (clonados por página).
 - Refinamento futuro: seleção `first`/`even`/`odd` por página real (hoje o mesmo
-  header/footer é clonado em todas). Campos de número de página (`PAGE`/
-  `NUMPAGES`) não são recalculados — mostram o valor em cache do Word (ex.:
-  "Página 2 | 15" repetido). Recalcular exige reescrever os campos por página.
+  header/footer é clonado em todas).
+
+**F12. Número de página (`PAGE`/`NUMPAGES`)** — ✅ **implementado**.
+- **Problema:** os campos `PAGE`/`NUMPAGES` mostravam o valor em cache do Word
+  ("Página 2 | 15" repetido em todas as páginas), pois o resultado do campo é
+  renderizado como texto e nunca recalculado.
+- **Abordagem adotada:** o parser (`document_parser_runs.dart` →
+  `_markFieldResults`) rastreia o estado do campo (begin/instrText/separate/end)
+  e marca o *run resultado* de PAGE/NUMPAGES com `run.fieldType`; o renderer
+  emite `data-docx-field="PAGE|NUMPAGES"`. No fim da paginação,
+  `_numberPages` percorre **todas** as `section.docx` finais e reescreve o texto:
+  PAGE = índice global (1..N), NUMPAGES = N.
+- **Resultado:** "Página 1 | 19", "Página 2 | 19"… — número real por página
+  (verificado: `PAGE=[1,2,3] NUMPAGES=[19,19]`).
 
 **F10. Quebra de tabelas entre páginas** — ✅ **implementado**.
 - **Problema:** a v1 era *block-atômica* — uma tabela maior que a página ficava
@@ -210,8 +221,19 @@ nos dois documentos.*
 - **F7.** Tab stops (`w:tabs`) — a feature é `experimental` e hoje não computa
   posições reais (`_refreshTabStops` é no-op). Alinhamentos por tabulação em
   cabeçalhos podem depender disso.
-- **F8.** Mapeamento de fontes ausentes (ex.: `Ecofont_Spranq_eco_Sans` →
-  fallback). Conferir se o fallback casa com a métrica do Word.
+- **F8. Altura de conteúdo / entrelinha vs Word** — ✅ **investigado e
+  confirmado; sem correção necessária**. Medido no ETP (harness): 437 parágrafos
+  de corpo em **Arial** (fonte correta) com **entrelinha 18,4px = 1,15 × 12pt**,
+  exatamente o que o docx especifica; parágrafos vazios são só 6 (96px, irrelev.).
+  **Prova definitiva:** o PDF de referência do ETP (`resources/<doc>/…-01..19.png`)
+  tem **19 páginas** e rodapé "Página 1 | 19" — **igual ao nosso render**. O "15"
+  era `NUMPAGES` em cache de uma versão antiga. Forçar 15 seria *sub-renderizar*.
+- **F8b (refinamento fino, opcional).** No ETP, nossa página 1 empacota um pouco
+  *mais* que o PDF (termina na seção 4; o PDF termina na 3) — as linhas do Word
+  são marginalmente mais altas que o `line-height:1,15` do CSS. A **contagem
+  total ainda bate (19=19)**; só os pontos de quebra por página diferem um pouco.
+  Casar o modelo de line-box do Word (auto/single) aproximaria as quebras, mas é
+  arriscado e não muda a contagem. Baixa prioridade.
 - **F9.** Cores/sombreamento de células (`w:shd`) em cabeçalhos de tabela.
 
 ---

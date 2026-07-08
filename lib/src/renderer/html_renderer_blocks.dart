@@ -42,7 +42,7 @@ web.Node? _renderRun(HtmlRenderer self, WmlRun run) {
   final result = _toHTML(self, run, HtmlNs.html, 'span', children);
 
   if (run.id != null) {
-    (result as web.HTMLElement).id = run.id!;
+    result.id = run.id!;
   }
 
   // Mark PAGE/NUMPAGES field results so the pagination pass can renumber them.
