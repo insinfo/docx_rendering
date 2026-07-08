@@ -19,7 +19,8 @@ import 'package:shelf_static/shelf_static.dart';
 ///   dart run test/render_harness.dart resources/x.docx
 ///   dart run test/render_harness.dart --no-compile   # skip the JS compile step
 const _chromePath = r'C:\Program Files\Google\Chrome\Application\chrome.exe';
-const _port = 8080;
+// 8081 (not 8080) so the harness never collides with a running `webdev serve`.
+const _port = 8081;
 
 Future<void> main(List<String> argv) async {
   final projectRoot = Directory.current.path;

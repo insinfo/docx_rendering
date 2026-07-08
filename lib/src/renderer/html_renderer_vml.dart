@@ -16,14 +16,12 @@ web.Node _renderVmlElement(HtmlRenderer self, VmlElement elem) {
     // leaves floating shapes/textboxes mispositioned. Translate it to real CSS.
     final style = _translateVmlStyle(elem.cssStyleText!);
     if (elem.borderCss != null) {
-      // Border only: the authored box height fits the text exactly, so adding
-      // padding/box-sizing would shrink the content area and clip the last line
-      // (the foreignObject clips to its bounds). The border draws outside.
       style['border'] = elem.borderCss!;
+      _applyTextBoxInset(style);
     }
     containerProps['style'] = style;
   } else if (elem.borderCss != null) {
-    containerProps['style'] = {'border': elem.borderCss!};
+    containerProps['style'] = {'border': elem.borderCss!, 'padding': _boxPad};
   }
   
   final container = self.hFunc(containerProps) as web.SVGElement;
@@ -92,6 +90,22 @@ web.SVGElement _renderVmlChildElement(HtmlRenderer self, VmlElement elem) {
 /// offsets anchor to the nearest positioned ancestor — the header/footer is
 /// made `position: relative` (see `_renderDefaultStyle`) so `right:0` aligns to
 /// the content area (between margins), matching Word.
+// Word's default text-box internal margin (inset): ~0.05in vertical (3.6pt).
+const String _boxPad = '3.6pt 7.2pt';
+
+/// Insets the text from a text-box border so it doesn't touch it (like Word).
+///
+/// Only *vertical* padding is applied. Padding on the `<svg>` sits between the
+/// border and the `<foreignObject>` viewport, so the viewport keeps its authored
+/// height (no clipping of the last line) and the box just grows downward a
+/// little. Horizontal padding is intentionally skipped: the box is right-anchored
+/// and our text renders a touch wider than Word's, so growing the width would
+/// overlap the header, while shrinking the viewport would wrap a line and clip
+/// the last one. Vertical-only is the safe inset that never loses content.
+void _applyTextBoxInset(Map<String, String> style) {
+  style['padding'] = '3.6pt 0';
+}
+
 Map<String, String> _translateVmlStyle(String raw) {
   final map = <String, String>{};
   for (final decl in raw.split(';')) {

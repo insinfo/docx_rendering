@@ -88,7 +88,7 @@ paginação.
 | Tabelas multi-página (TR) | ✅ Fiel | Bordas, `colspan` (SUBTOTAL), merge vertical, larguras de coluna, quebra de célula e negrito corretos |
 | Imagens (brasão, logos) | ✅ Carregam | `images loaded = 2/2` (ETP), `5/5` (TR); base64 embutido OK |
 | Fontes / cores de tema | ✅ OK | Variáveis `--docx-*-color`, mapeamento de fontes de estilo aplicados |
-| **Caixa VML "Continuação de Processo"** | ✅ Corrigido (F1+F2) | Reposicionada (F1) e agora **com borda** (F2), envolvendo as 4 linhas, igual ao Word |
+| **Caixa VML "Continuação de Processo"** | ✅ Corrigido (F1+F2+F15) | Reposicionada (F1), **com borda** (F2) e **inset interno vertical** (F15) — texto não encosta na borda, igual ao Word |
 | **Composição do cabeçalho (objetos flutuantes)** | ✅ Corrigido (F1) | Caixa VML reposicionada; layout horizontal fiel nos dois docs |
 | **Paginação dinâmica** | ✅ v3 (F3+F10+F11) | Cabeçalho/rodapé por página; **tabelas** quebradas linha-a-linha (repetindo `w:tblHeader`); **parágrafos longos** quebrados no limite da linha (sem cortar palavra). ETP: 1 → 19; TR: 3 → 158 |
 | **Número de página (`PAGE`/`NUMPAGES`)** | ✅ Corrigido (F12) | Antes "Página 2 \| 15" repetido (cache do Word); agora "Página 1 \| 19", "Página 2 \| 19"… recalculado por página |
@@ -156,6 +156,20 @@ contra o PDF pág. 6).
   batem com o PDF.
 - **Risco:** Baixo — células com `tcBorders` próprios têm precedência (cópia só
   preenche o que falta); GRUPO/requisitos sem regressão.
+
+**F15. Inset interno da caixa VML (padding)** — ✅ **implementado**.
+- **Problema:** o texto encostava na borda da caixa; o Word tem uma margem
+  interna (inset padrão ~0.05in/0.1in).
+- **Abordagem:** `padding` **vertical** na `<svg>` — fica entre a borda e o
+  *viewport* do `<foreignObject>` (que mantém a altura autoral), então insere o
+  texto no topo/base **sem cortar** a última linha; a caixa só cresce um pouco
+  para baixo. O padding **horizontal foi omitido de propósito**: a caixa é
+  ancorada à direita e nosso texto renderiza um pouco mais largo que o do Word —
+  crescer a largura invadiria o cabeçalho, e encolher o *viewport* quebraria uma
+  linha e cortaria a última. Vertical-only é o inset seguro que nunca perde
+  conteúdo. (Refinamento futuro: inset horizontal fiel exigiria casar a métrica
+  de fonte — ver F8b.)
+- **Risco:** Baixo — sem corte, sem sobreposição, validado nos dois docs.
 
 **F1. Posicionamento da caixa VML (textbox flutuante)** — *defeito nº 1, aparece
 nos dois documentos.*
