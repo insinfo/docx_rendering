@@ -1,0 +1,1 @@
+No Content: https://template.tiptap.dev/_vercel/insights/script.js

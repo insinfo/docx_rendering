@@ -1,0 +1,60 @@
+*.log
+.cache
+.DS_Store
+.temp
+node_modules
+dist
+.env
+.env.*
+
+.instructions
+.agent
+
+docs
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+
+# Turbo cache
+.turbo
+
+# Linter caches
+.eslintcache
+
+.rpt2_cache
+.rts2_cache
+.rts2_cache_cjs
+.rts2_cache_es
+.rts2_cache_umd
+
+# Playwright
+/playwright-report
+/test-results
+/playwright/.cache
+/blob-report
+# Ignore intellij project files
+.idea
+
+# packaged files
+/package-dist-artifacts.tar
+packages/**/*.tgz
+packages-deprecated/**/*.tgz
+demos/*.tgz
+
+# pnpm
+.pnpm-store
+
+# demo directories
+demos/src/Dev/**
+!demos/src/Dev/.gitkeep
+
+# instructions
+.github/instructions/*
+!.github/instructions/tiptap.instructions.md
+!.github/instructions/changeset.instructions.md
+!.github/instructions/PR.instructions.md

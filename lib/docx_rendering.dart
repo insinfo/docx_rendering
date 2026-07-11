@@ -1,8 +1,8 @@
 /// Main entry point for docx_rendering.
 
-export 'src/docx_preview.dart';
-export 'src/word_document.dart';
-export 'src/document_parser.dart';
-export 'src/html_renderer.dart';
-export 'src/html.dart';
-export 'src/renderer/pagination.dart';
+export 'src/docx_rendering/docx_preview.dart';
+export 'src/docx_rendering/word_document.dart';
+export 'src/docx_rendering/document_parser.dart';
+export 'src/docx_rendering/html_renderer.dart';
+export 'src/docx_rendering/html.dart';
+export 'src/docx_rendering/renderer/pagination.dart';
