@@ -25,7 +25,7 @@ class NumberingPart extends Part implements NumberingPartProperties {
       : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     final parsed = parseNumberingPart(root, package_.xmlParser);
     numberings = parsed.numberings;
     abstractNumberings = parsed.abstractNumberings;
@@ -33,3 +33,4 @@ class NumberingPart extends Part implements NumberingPartProperties {
     domNumberings = _documentParser.parseNumberingFile(root);
   }
 }
+

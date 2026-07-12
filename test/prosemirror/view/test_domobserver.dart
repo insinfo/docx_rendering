@@ -49,7 +49,6 @@ void main() {
     ));
 
     final domOne = view.dom.childNodes.item(0)!;
-    final domTwo = view.dom.childNodes.item(1)!;
     final domThree = view.dom.childNodes.item(2)!;
 
     // Test 1: State update localized re-render

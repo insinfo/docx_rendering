@@ -16,7 +16,8 @@ class StylesPart extends Part {
       : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     styles = _documentParser.parseStylesFile(root);
   }
 }
+

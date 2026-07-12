@@ -13,7 +13,8 @@ class ThemePart extends Part {
   ThemePart(OpenXmlPackage pkg, String path) : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     theme = parseTheme(root, package_.xmlParser);
   }
 }
+

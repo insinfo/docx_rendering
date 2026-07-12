@@ -13,7 +13,8 @@ class CorePropsPart extends Part {
   CorePropsPart(OpenXmlPackage pkg, String path) : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     props = parseCoreProps(root, package_.xmlParser);
   }
 }
+

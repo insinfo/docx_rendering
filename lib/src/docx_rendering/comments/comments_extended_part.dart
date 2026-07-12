@@ -23,7 +23,7 @@ class CommentsExtendedPart extends Part {
   CommentsExtendedPart(OpenXmlPackage pkg, String path) : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     final xml = package_.xmlParser;
 
     for (final el in xml.elements(root, 'commentEx')) {
@@ -37,3 +37,4 @@ class CommentsExtendedPart extends Part {
     commentMap = keyBy(comments, (c) => c.paraId ?? '');
   }
 }
+

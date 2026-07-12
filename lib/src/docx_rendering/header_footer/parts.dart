@@ -17,7 +17,7 @@ abstract class BaseHeaderFooterPart<T extends OpenXmlElement> extends Part {
       : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     rootElement = createRootElement();
     rootElement!.children = _documentParser.parseBodyElements(root);
   }
@@ -46,3 +46,4 @@ class FooterPart extends BaseHeaderFooterPart<WmlFooter> {
     return WmlFooter();
   }
 }
+

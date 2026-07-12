@@ -13,7 +13,8 @@ class CustomPropsPart extends Part {
   CustomPropsPart(OpenXmlPackage pkg, String path) : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     props = parseCustomProps(root, package_.xmlParser);
   }
 }
+

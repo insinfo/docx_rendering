@@ -22,7 +22,7 @@ class FootnotesPart extends BaseNotePart<WmlFootnote> {
       : super(pkg, path, parser);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     notes = _documentParser.parseNotes<WmlFootnote>(
         root, 'footnote', () => WmlFootnote());
   }
@@ -34,8 +34,9 @@ class EndnotesPart extends BaseNotePart<WmlEndnote> {
       : super(pkg, path, parser);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     notes = _documentParser.parseNotes<WmlEndnote>(
         root, 'endnote', () => WmlEndnote());
   }
 }
+

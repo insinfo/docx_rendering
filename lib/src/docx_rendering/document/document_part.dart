@@ -18,7 +18,7 @@ class DocumentPart extends Part {
       : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
-    body = _documentParser.parseDocumentFile(root);
+  Future<void> parseXml(web.Element root) async {
+    body = await _documentParser.parseDocumentFileAsync(root);
   }
 }

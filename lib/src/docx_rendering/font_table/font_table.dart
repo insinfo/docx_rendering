@@ -13,7 +13,8 @@ class FontTablePart extends Part {
   FontTablePart(OpenXmlPackage pkg, String path) : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     fonts = parseFonts(root, package_.xmlParser);
   }
 }
+

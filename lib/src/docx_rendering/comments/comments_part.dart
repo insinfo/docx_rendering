@@ -19,8 +19,9 @@ class CommentsPart extends Part {
       : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     comments = _documentParser.parseComments(root);
     commentMap = keyBy(comments, (c) => c.id ?? '');
   }
 }
+

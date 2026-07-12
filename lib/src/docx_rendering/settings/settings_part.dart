@@ -13,7 +13,8 @@ class SettingsPart extends Part {
   SettingsPart(OpenXmlPackage pkg, String path) : super(pkg, path);
 
   @override
-  void parseXml(web.Element root) {
+  Future<void> parseXml(web.Element root) async {
     settings = parseSettings(root, package_.xmlParser);
   }
 }
+

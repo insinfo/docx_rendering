@@ -53,11 +53,14 @@ class DocumentParser {
   DocumentElement parseDocumentFile(dynamic xmlDoc) =>
       _parseDocumentFile(this, xmlDoc);
 
-  Map<String, String> parseBackground(dynamic elem) =>
-      _parseBackground(this, elem);
+  Future<DocumentElement> parseDocumentFileAsync(dynamic xmlDoc) =>
+      _parseDocumentFileAsync(this, xmlDoc);
 
   List<OpenXmlElement> parseBodyElements(dynamic element) =>
       _parseBodyElements(this, element);
+
+  Map<String, String> parseBackground(dynamic elem) =>
+      _parseBackground(this, elem);
 
   // Styles parsing
   List<IDomStyle> parseStylesFile(dynamic xstyles) =>

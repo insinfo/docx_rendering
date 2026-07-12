@@ -33,7 +33,7 @@ class Part {
 
     final root = xmlDoc.documentElement;
     if (root != null) {
-      parseXml(root);
+      await parseXml(root);
     }
   }
 
@@ -44,6 +44,6 @@ class Part {
     }
   }
 
-  /// Override in subclasses to parse the part's XML.
-  void parseXml(web.Element root) {}
+  /// Parses the XML content of this part.
+  Future<void> parseXml(web.Element root) async {}
 }

@@ -43,6 +43,18 @@ DocumentElement _parseDocumentFile(DocumentParser self, dynamic xmlDoc) {
     ..cssStyle = background != null ? self.parseBackground(background) : {};
 }
 
+Future<DocumentElement> _parseDocumentFileAsync(DocumentParser self, dynamic xmlDoc) async {
+  final xbody = globalXmlParser.element(xmlDoc, 'body');
+  final background = globalXmlParser.element(xmlDoc, 'background');
+  final sectPr = xbody != null ? globalXmlParser.element(xbody, 'sectPr') : null;
+
+  return DocumentElement()
+    ..type = DomType.document
+    ..children = xbody != null ? await _parseBodyElementsAsync(self, xbody) : []
+    ..sectionProps = sectPr != null ? parseSectionProperties(sectPr, globalXmlParser) : SectionProperties()
+    ..cssStyle = background != null ? self.parseBackground(background) : {};
+}
+
 Map<String, String> _parseBackground(DocumentParser self, dynamic elem) {
   final result = <String, String>{};
   final color = globalXmlParser.colorAttr(elem, 'color');
@@ -58,6 +70,32 @@ List<OpenXmlElement> _parseBodyElements(DocumentParser self, dynamic element) {
   final children = <OpenXmlElement>[];
 
   for (final elem in globalXmlParser.elements(element)) {
+    switch (globalXmlParser.localName(elem)) {
+      case 'p':
+        children.add(self.parseParagraph(elem));
+        break;
+      case 'altChunk':
+        children.add(self.parseAltChunk(elem));
+        break;
+      case 'tbl':
+        children.add(self.parseTable(elem));
+        break;
+      case 'sdt':
+        children.addAll(self.parseSdt(elem, (e) => self.parseBodyElements(e)));
+        break;
+    }
+  }
+
+  return children;
+}
+
+Future<List<OpenXmlElement>> _parseBodyElementsAsync(DocumentParser self, dynamic element) async {
+  final children = <OpenXmlElement>[];
+  int count = 0;
+  for (final elem in globalXmlParser.elements(element)) {
+    if (++count % 50 == 0) {
+      await Future.delayed(Duration.zero);
+    }
     switch (globalXmlParser.localName(elem)) {
       case 'p':
         children.add(self.parseParagraph(elem));
