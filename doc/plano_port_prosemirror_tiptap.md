@@ -640,16 +640,16 @@ Portar de `referencias/prosemirror-view/src/`:
 - [x] `clipboard.dart`: copy/cut/paste com `DOMSerializer`/`parseSlice`.
 - [x] Sincronização de seleção DOM ↔ `Selection` do state.
 - [x] `decoration.dart`: `Decoration.widget/inline/node` + `DecorationSet`.
-- [ ] Portar `prosemirror-dropcursor` (fonte em `referencias/prosemirror-dropcursor`).
+- [x] Portar `prosemirror-dropcursor` (plugin visual via `PluginSpec.view`, `DropCursorView` e extensão Tiptap `DropcursorExtension`).
 
-**Aceite parcial já validado:** `web/tiptap_demo.html` compila para JS e, em Chrome headless via Playwright, aceita digitação, `Ctrl+B`, `Ctrl+Z`/`Ctrl+Y`, `getTiptapHTML()` e `setEditable(false)` sem erros de console.
+**Aceite parcial já validado:** `web/tiptap_demo.html` compila para JS e, em Chrome headless via Playwright, aceita digitação, `Ctrl+B`, `Ctrl+Z`/`Ctrl+Y`, `getTiptapHTML()` e `setEditable(false)` sem erros de console. O dropcursor também foi validado por smoke de `dragover`, criando `.prosemirror-dropcursor-*`.
 
 ### Etapa F: A Ergonomia (Tiptap Core & Extensions)
 - [x] Criar `lib/src/tiptap/core/extension_manager.dart`.
 - [x] Criar `lib/src/tiptap/core/command_manager.dart` com chain mínimo (`focus`, `toggleBold`, `toggleItalic`, `undo`, `redo`, `run`).
 - [x] Criar extensões base abstratas (`Extension`, `Node`, `Mark`).
 - [x] Criar `lib/src/tiptap/core/editor.dart` com plugins padrão (`history`, `keymap`, bold/italic), `getHTML`, `getJSON`, `setEditable` e `isActive` básico.
-- [x] Construir extensões concretas: `Document`, `Text`, `Paragraph`, `Bold`, `Italic`.
+- [x] Construir extensões concretas: `Document`, `Text`, `Paragraph`, `Bold`, `Italic`, `Dropcursor`.
 - [x] Portar e validar o teste `test/tiptap/core/test_extension_manager.dart`.
 - [x] `dart analyze lib/src/tiptap/core test/tiptap` está limpo.
 - [x] `dart test test/tiptap/core/test_extension_manager.dart` passou.

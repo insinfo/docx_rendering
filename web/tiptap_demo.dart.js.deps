@@ -1,6 +1,8 @@
 file:///C:/MyDartProjects/docx_rendering/.dart_tool/package_config.json
 file:///C:/MyDartProjects/docx_rendering/lib/src/prosemirror/commands/commands.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/prosemirror/commands/index.dart
+file:///C:/MyDartProjects/docx_rendering/lib/src/prosemirror/dropcursor/dropcursor.dart
+file:///C:/MyDartProjects/docx_rendering/lib/src/prosemirror/dropcursor/index.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/prosemirror/history/history.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/prosemirror/keymap/keymap.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/prosemirror/model/comparedeep.dart
@@ -48,6 +50,7 @@ file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/core/extension_manager.d
 file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/core/index.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/extensions/bold.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/extensions/document.dart
+file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/extensions/dropcursor.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/extensions/index.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/extensions/italic.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/extensions/paragraph.dart

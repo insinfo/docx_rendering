@@ -14,6 +14,7 @@ void main() {
       TextExtension(),
       BoldExtension(),
       ItalicExtension(),
+      DropcursorExtension(),
     ],
   ));
   final window = web.window as JSObject;

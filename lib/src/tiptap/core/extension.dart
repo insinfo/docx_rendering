@@ -1,4 +1,5 @@
 import '../../prosemirror/model/index.dart';
+import '../../prosemirror/state/index.dart';
 
 abstract class AnyExtension {
   const AnyExtension();
@@ -7,6 +8,8 @@ abstract class AnyExtension {
 abstract class Extension extends AnyExtension {
   final String name;
   const Extension(this.name);
+
+  List<Plugin> addPlugins() => const [];
 }
 
 abstract class NodeExtension extends Extension {

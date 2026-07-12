@@ -85,6 +85,7 @@ class EditorView {
   ViewDesc? lastSelectedViewDesc;
   Dragging? dragging;
   bool requiresGeckoHackNode = false;
+  List<PluginView> pluginViews = [];
 
   EditorView(web.HTMLElement? place, DirectEditorProps props)
       : state = props.state,
@@ -109,11 +110,13 @@ class EditorView {
     });
     domObserver.start();
     initInput(this);
+    updatePluginViews();
   }
 
   DirectEditorProps get props => _props;
 
   void update(DirectEditorProps props) {
+    final pluginsChanged = props.plugins != _props.plugins;
     _props = props;
     if (props.plugins != null) {
       directPlugins
@@ -121,6 +124,7 @@ class EditorView {
         ..addAll(props.plugins!);
     }
     updateState(props.state);
+    if (pluginsChanged) updatePluginViews();
   }
 
   void updateState(EditorState newState) {
@@ -149,6 +153,9 @@ class EditorView {
       }
       selectionToDOM(this, updateDoc);
       domObserver.start();
+    }
+    for (final pluginView in pluginViews) {
+      pluginView.update?.call(this, prev);
     }
   }
 
@@ -188,6 +195,10 @@ class EditorView {
   }
 
   void destroy() {
+    for (final pluginView in pluginViews) {
+      pluginView.destroy?.call();
+    }
+    pluginViews = [];
     destroyInput(this);
     domObserver.stop();
     docView.destroy();
@@ -196,11 +207,25 @@ class EditorView {
     }
   }
 
+  void updatePluginViews() {
+    for (final pluginView in pluginViews) {
+      pluginView.destroy?.call();
+    }
+    pluginViews = [];
+    final seen = <Plugin>{};
+    for (final plugin in [...directPlugins, ...state.plugins]) {
+      if (seen.contains(plugin)) continue;
+      seen.add(plugin);
+      final createView = plugin.spec.view;
+      if (createView != null) pluginViews.add(createView(this));
+    }
+  }
+
   late bool editable;
 
   bool get composing => input.composing;
 
-  dynamic get root => dom.getRootNode();
+  web.Node get root => dom.getRootNode();
 
   web.Selection? domSelection() {
     final currentRoot = root;

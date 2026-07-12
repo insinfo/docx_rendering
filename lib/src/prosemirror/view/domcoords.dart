@@ -177,7 +177,7 @@ StoredScrollPos storeScrollPos(EditorView view) {
   for (double y = startY + 1;
       y < math.min(web.window.innerHeight.toDouble(), rect.bottom);
       y += 5) {
-    final dom = view.root.elementFromPoint(x, y);
+    final dom = (view.root as dynamic).elementFromPoint(x, y) as web.Element?;
     if (dom == null || dom == view.dom || !view.dom.contains(dom)) continue;
     final localRect = dom.getBoundingClientRect();
     if (localRect.top >= startY - 20) {
@@ -711,7 +711,7 @@ Rect flattenH(Rect rect, bool top) {
 
 T withFlushedState<T>(EditorView view, EditorState state, T Function() f) {
   final viewState = view.state;
-  final active = view.root.activeElement as web.HTMLElement?;
+  final active = (view.root as dynamic).activeElement as web.HTMLElement?;
   if (viewState != state) view.updateState(state);
   if (active != view.dom) view.focus();
   try {

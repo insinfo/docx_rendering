@@ -20,7 +20,8 @@ class Attribute {
   bool get isRequired => !hasDefault;
 }
 
-void Function(dynamic) _validateType(String typeName, String attrName, String type) {
+void Function(dynamic) _validateType(
+    String typeName, String attrName, String type) {
   return (dynamic value) {
     // Simplified runtime type checking (in Dart we might use 'int', 'String', 'bool', etc.)
     // Simplified runtime type checking (in Dart we might use 'int', 'String', 'bool', etc.)
@@ -35,7 +36,7 @@ class NodeType {
   final List<String> groups;
   final Map<String, Attribute> attrs;
   final Map<String, dynamic> defaultAttrs;
-  
+
   late ContentMatch contentMatch;
   late bool inlineContent;
   late bool isBlock;
@@ -58,7 +59,8 @@ class NodeType {
 
   bool isInGroup(String group) => groups.contains(group);
 
-  String get whitespace => spec.whitespace ?? (spec.code == true ? "pre" : "normal");
+  String get whitespace =>
+      spec.whitespace ?? (spec.code == true ? "pre" : "normal");
 
   bool hasRequiredAttrs() {
     for (var attr in attrs.values) {
@@ -76,18 +78,22 @@ class NodeType {
     return _computeAttrs(attrs, attrsArgs);
   }
 
-  PMNode create([Map<String, dynamic>? attrsArgs, dynamic content, List<Mark>? marks]) {
+  PMNode create(
+      [Map<String, dynamic>? attrsArgs, dynamic content, List<Mark>? marks]) {
     if (isText) throw StateError("NodeType.create can't construct text nodes");
-    return PMNode(this, computeAttrs(attrsArgs), Fragment.from(content), Mark.setFrom(marks));
+    return PMNode(this, computeAttrs(attrsArgs), Fragment.from(content),
+        Mark.setFrom(marks));
   }
 
-  PMNode createChecked([Map<String, dynamic>? attrsArgs, dynamic content, List<Mark>? marks]) {
+  PMNode createChecked(
+      [Map<String, dynamic>? attrsArgs, dynamic content, List<Mark>? marks]) {
     Fragment frag = Fragment.from(content);
     checkContent(frag);
     return PMNode(this, computeAttrs(attrsArgs), frag, Mark.setFrom(marks));
   }
 
-  PMNode? createAndFill([Map<String, dynamic>? attrsArgs, dynamic content, List<Mark>? marks]) {
+  PMNode? createAndFill(
+      [Map<String, dynamic>? attrsArgs, dynamic content, List<Mark>? marks]) {
     Map<String, dynamic> computedAttrs = computeAttrs(attrsArgs);
     Fragment frag = Fragment.from(content);
     if (frag.size > 0) {
@@ -145,7 +151,8 @@ class NodeType {
     return copy == null ? marks : (copy.isEmpty ? Mark.none : copy);
   }
 
-  static Map<String, NodeType> compile(Map<String, NodeSpec> nodes, Schema schema) {
+  static Map<String, NodeType> compile(
+      Map<String, NodeSpec> nodes, Schema schema) {
     Map<String, NodeType> result = {};
     nodes.forEach((name, spec) => result[name] = NodeType(name, schema, spec));
     String topType = schema.spec.topNode ?? "doc";
@@ -182,10 +189,12 @@ class MarkType {
     return Mark(this, _computeAttrs(attrs, attrsArgs));
   }
 
-  static Map<String, MarkType> compile(Map<String, MarkSpec> marks, Schema schema) {
+  static Map<String, MarkType> compile(
+      Map<String, MarkSpec> marks, Schema schema) {
     Map<String, MarkType> result = {};
     int rank = 0;
-    marks.forEach((name, spec) => result[name] = MarkType(name, rank++, schema, spec));
+    marks.forEach(
+        (name, spec) => result[name] = MarkType(name, rank++, schema, spec));
     return result;
   }
 
@@ -234,34 +243,46 @@ class Schema {
       NodeType type = nodes[prop]!;
       String contentExpr = type.spec.content ?? "";
       String? markExpr = type.spec.marks;
-      type.contentMatch = contentExprCache[contentExpr] ??= ContentMatch.parse(contentExpr, nodes);
+      type.contentMatch = contentExprCache[contentExpr] ??=
+          ContentMatch.parse(contentExpr, nodes);
       type.inlineContent = type.contentMatch.inlineContent;
-      
+
       if (type.spec.linebreakReplacement == true) {
-        if (linebreakReplacement != null) throw RangeError("Multiple linebreak nodes defined");
-        if (!type.isInline || !type.isLeaf) throw RangeError("Linebreak replacement nodes must be inline leaf nodes");
+        if (linebreakReplacement != null)
+          throw RangeError("Multiple linebreak nodes defined");
+        if (!type.isInline || !type.isLeaf)
+          throw RangeError(
+              "Linebreak replacement nodes must be inline leaf nodes");
         linebreakReplacement = type;
       }
-      
-      type.markSet = markExpr == "_" ? null : (markExpr != null ? (markExpr == "" ? [] : _gatherMarks(this, markExpr.split(" "))) : (!type.inlineContent ? [] : null));
+
+      type.markSet = markExpr == "_"
+          ? null
+          : (markExpr != null
+              ? (markExpr == "" ? [] : _gatherMarks(this, markExpr.split(" ")))
+              : (!type.inlineContent ? [] : null));
     }
-    
+
     for (String prop in marks.keys) {
       MarkType type = marks[prop]!;
       String? excl = type.spec.excludes;
-      type.excluded = excl == null ? [type] : (excl == "" ? [] : _gatherMarks(this, excl.split(" ")));
+      type.excluded = excl == null
+          ? [type]
+          : (excl == "" ? [] : _gatherMarks(this, excl.split(" ")));
     }
-    
+
     topNodeType = nodes[spec.topNode ?? "doc"]!;
   }
 
-  PMNode node(dynamic type, [Map<String, dynamic>? attrs, dynamic content, List<Mark>? marksList]) {
+  PMNode node(dynamic type,
+      [Map<String, dynamic>? attrs, dynamic content, List<Mark>? marksList]) {
     NodeType t;
     if (type is String) {
       t = nodeType(type);
     } else if (type is NodeType) {
       t = type;
-      if (t.schema != this) throw RangeError("Node type from different schema used (${t.name})");
+      if (t.schema != this)
+        throw RangeError("Node type from different schema used (${t.name})");
     } else {
       throw RangeError("Invalid node type: $type");
     }
@@ -319,6 +340,7 @@ class NodeSpec {
   final bool? linebreakReplacement;
   final List<dynamic>? parseDOM;
   final dynamic Function(PMNode)? toDOM;
+  final dynamic disableDropCursor;
 
   /// Experimental prosemirror-view kludge: when true, the view re-parses the
   /// node from the DOM instead of relying on its view desc (TS accesses this
@@ -346,6 +368,7 @@ class NodeSpec {
     this.linebreakReplacement,
     this.parseDOM,
     this.toDOM,
+    this.disableDropCursor,
     this.reparseInView,
     this.leafText,
     this.toDebugString,
@@ -398,7 +421,8 @@ Map<String, dynamic>? _defaultAttrs(Map<String, Attribute> attrs) {
   return defaults;
 }
 
-Map<String, dynamic> _computeAttrs(Map<String, Attribute> attrs, Map<String, dynamic>? value) {
+Map<String, dynamic> _computeAttrs(
+    Map<String, Attribute> attrs, Map<String, dynamic>? value) {
   Map<String, dynamic> built = {};
   for (String name in attrs.keys) {
     dynamic given = value?[name];
@@ -415,9 +439,11 @@ Map<String, dynamic> _computeAttrs(Map<String, Attribute> attrs, Map<String, dyn
   return built;
 }
 
-void _checkAttrs(Map<String, Attribute> attrs, Map<String, dynamic> values, String type, String name) {
+void _checkAttrs(Map<String, Attribute> attrs, Map<String, dynamic> values,
+    String type, String name) {
   for (String attr in values.keys) {
-    if (!attrs.containsKey(attr)) throw RangeError("Unsupported attribute $attr for $type of type $name");
+    if (!attrs.containsKey(attr))
+      throw RangeError("Unsupported attribute $attr for $type of type $name");
   }
   for (String attr in attrs.keys) {
     if (attrs[attr]!.validate != null) {
@@ -426,7 +452,8 @@ void _checkAttrs(Map<String, Attribute> attrs, Map<String, dynamic> values, Stri
   }
 }
 
-Map<String, Attribute> _initAttrs(String typeName, Map<String, AttributeSpec>? attrs) {
+Map<String, Attribute> _initAttrs(
+    String typeName, Map<String, AttributeSpec>? attrs) {
   Map<String, Attribute> result = {};
   if (attrs != null) {
     for (String name in attrs.keys) {
@@ -447,7 +474,8 @@ List<MarkType> _gatherMarks(Schema schema, List<String> marks) {
     } else {
       for (String prop in schema.marks.keys) {
         MarkType m = schema.marks[prop]!;
-        if (name == "_" || (m.spec.group != null && m.spec.group!.split(" ").contains(name))) {
+        if (name == "_" ||
+            (m.spec.group != null && m.spec.group!.split(" ").contains(name))) {
           found.add(ok = m);
         }
       }

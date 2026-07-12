@@ -1477,7 +1477,6 @@ void renderDescs(
   for (int i = 0; i < descs.length; i++) {
     final desc = descs[i];
     final childDOM = desc.dom;
-    if (!childDOM.isA<web.Node>()) continue;
     if (childDOM.parentNode == parentDOM) {
       while (childDOM != dom) {
         dom = rm(dom!);

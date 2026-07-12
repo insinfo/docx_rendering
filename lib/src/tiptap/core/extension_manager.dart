@@ -1,4 +1,5 @@
 import '../../prosemirror/model/index.dart';
+import '../../prosemirror/state/index.dart';
 import 'extension.dart';
 
 class ExtensionManager {
@@ -19,5 +20,13 @@ class ExtensionManager {
     return Schema(SchemaSpec(nodes: nodes, marks: marks));
   }
 
-  List<dynamic> createPlugins() => const [];
+  List<Plugin> createPlugins() {
+    final plugins = <Plugin>[];
+    for (final extension in extensions) {
+      if (extension is Extension) {
+        plugins.addAll(extension.addPlugins());
+      }
+    }
+    return plugins;
+  }
 }

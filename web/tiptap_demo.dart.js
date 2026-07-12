@@ -493,6 +493,16 @@
         return new A._EfficientLengthCastIterable(source, $S._eval$1("@<0>")._bind$1($T)._eval$1("_EfficientLengthCastIterable<1,2>"));
       return new A.CastIterable(source, $S._eval$1("@<0>")._bind$1($T)._eval$1("CastIterable<1,2>"));
     },
+    SystemHash_combine(hash, value) {
+      hash = hash + value & 536870911;
+      hash = hash + ((hash & 524287) << 10) & 536870911;
+      return hash ^ hash >>> 6;
+    },
+    SystemHash_finish(hash) {
+      hash = hash + ((hash & 67108863) << 3) & 536870911;
+      hash ^= hash >>> 11;
+      return hash + ((hash & 16383) << 15) & 536870911;
+    },
     checkNotNullable(value, $name, $T) {
       return value;
     },
@@ -788,6 +798,8 @@
     LateError: function LateError(t0) {
       this._message = t0;
     },
+    SentinelValue: function SentinelValue() {
+    },
     EfficientLengthIterable: function EfficientLengthIterable() {
     },
     ListIterable: function ListIterable() {
@@ -949,12 +961,14 @@
       return A._rtiToString(A.instanceType(object), null);
     },
     Primitives_safeToString(object) {
-      if (typeof object == "number" || A._isBool(object))
+      if (object == null || typeof object == "number" || A._isBool(object))
         return J.toString$0$(object);
       if (typeof object == "string")
         return JSON.stringify(object);
       if (object instanceof A.Closure)
         return object.toString$0(0);
+      if (object instanceof A._Record)
+        return object._toString$1(true);
       return "Instance of '" + A.Primitives_objectTypeName(object) + "'";
     },
     Primitives_stringFromCharCode(charCode) {
@@ -1198,6 +1212,8 @@
         return B.JSNumber_methods.get$hashCode(key);
       if (key instanceof A._Type)
         return A.Primitives_objectHashCode(key);
+      if (key instanceof A._Record)
+        return key.get$hashCode(key);
       return A.objectHashCode(key);
     },
     fillLiteralMap(keyValuePairs, result) {
@@ -1491,7 +1507,7 @@
     },
     LinkedHashMapKeyIterator$(_map, _modifications, $E) {
       var t1 = new A.LinkedHashMapKeyIterator(_map, _modifications, $E._eval$1("LinkedHashMapKeyIterator<0>"));
-      t1._cell = _map._first;
+      t1.__js_helper$_cell = _map.__js_helper$_first;
       return t1;
     },
     lookupAndCacheInterceptor(obj) {
@@ -1681,6 +1697,10 @@
       t1 = receiver.replace(nativeRegexp, A.escapeReplacement(replacement));
       return t1;
     },
+    _Record_2_handler_name: function _Record_2_handler_name(t0, t1) {
+      this._0 = t0;
+      this._1 = t1;
+    },
     ConstantMap: function ConstantMap() {
     },
     ConstantStringMap: function ConstantStringMap(t0, t1, t2) {
@@ -1756,8 +1776,8 @@
     JsLinkedHashMap: function JsLinkedHashMap(t0) {
       var _ = this;
       _.__js_helper$_length = 0;
-      _._last = _._first = _.__js_helper$_rest = _._nums = _._strings = null;
-      _._modifications = 0;
+      _.__js_helper$_last = _.__js_helper$_first = _.__js_helper$_rest = _.__js_helper$_nums = _.__js_helper$_strings = null;
+      _.__js_helper$_modifications = 0;
       _.$ti = t0;
     },
     JsLinkedHashMap_values_closure: function JsLinkedHashMap_values_closure(t0) {
@@ -1769,7 +1789,7 @@
     LinkedHashMapCell: function LinkedHashMapCell(t0, t1) {
       this.hashMapCellKey = t0;
       this.hashMapCellValue = t1;
-      this._next = null;
+      this.__js_helper$_next = null;
     },
     LinkedHashMapKeyIterable: function LinkedHashMapKeyIterable(t0, t1) {
       this._map = t0;
@@ -1778,15 +1798,15 @@
     LinkedHashMapKeyIterator: function LinkedHashMapKeyIterator(t0, t1, t2) {
       var _ = this;
       _._map = t0;
-      _._modifications = t1;
-      _.__js_helper$_current = _._cell = null;
+      _.__js_helper$_modifications = t1;
+      _.__js_helper$_current = _.__js_helper$_cell = null;
       _.$ti = t2;
     },
     JsConstantLinkedHashMap: function JsConstantLinkedHashMap(t0) {
       var _ = this;
       _.__js_helper$_length = 0;
-      _._last = _._first = _.__js_helper$_rest = _._nums = _._strings = null;
-      _._modifications = 0;
+      _.__js_helper$_last = _.__js_helper$_first = _.__js_helper$_rest = _.__js_helper$_nums = _.__js_helper$_strings = null;
+      _.__js_helper$_modifications = 0;
       _.$ti = t0;
     },
     initHooks_closure: function initHooks_closure(t0) {
@@ -1797,6 +1817,10 @@
     },
     initHooks_closure1: function initHooks_closure1(t0) {
       this.prototypeForTag = t0;
+    },
+    _Record: function _Record() {
+    },
+    _Record2: function _Record2() {
     },
     JSSyntaxRegExp: function JSSyntaxRegExp(t0, t1) {
       var _ = this;
@@ -2105,7 +2129,10 @@
       return A.createRuntimeType(A._instanceType(object));
     },
     _structuralTypeOf(object) {
-      var functionRti = object instanceof A.Closure ? A.closureFunctionType(object) : null;
+      var functionRti;
+      if (object instanceof A._Record)
+        return A.evaluateRtiForRecord(object.$recipe, object._getFieldValues$0());
+      functionRti = object instanceof A.Closure ? A.closureFunctionType(object) : null;
       if (functionRti != null)
         return functionRti;
       if (type$.TrustedGetRuntimeType._is(object))
@@ -2127,6 +2154,22 @@
       starErasedRti = A._Universe_eval(init.typeUniverse, starErasedRecipe, true);
       t1 = starErasedRti._cachedRuntimeType;
       return t1 == null ? starErasedRti._cachedRuntimeType = A._createRuntimeType(starErasedRti) : t1;
+    },
+    evaluateRtiForRecord(recordRecipe, valuesList) {
+      var bindings, i,
+        values = valuesList,
+        $length = values.length;
+      if ($length === 0)
+        return type$.Record_0;
+      if (0 >= $length)
+        return A.ioore(values, 0);
+      bindings = A._Universe_evalInEnvironment(init.typeUniverse, A._structuralTypeOf(values[0]), "@<0>");
+      for (i = 1; i < $length; ++i) {
+        if (!(i < values.length))
+          return A.ioore(values, i);
+        bindings = A._Universe_bind(init.typeUniverse, bindings, A._structuralTypeOf(values[i]));
+      }
+      return A._Universe_evalInEnvironment(init.typeUniverse, bindings, recordRecipe);
     },
     typeLiteral(recipe) {
       return A.createRuntimeType(A._Universe_eval(init.typeUniverse, recipe, false));
@@ -3455,7 +3498,8 @@
       A.Timer__createTimer(B.Duration_0, type$.void_Function._as(callback));
     },
     Timer__createTimer(duration, callback) {
-      return A._TimerImpl$(duration._duration / 1000 | 0, callback);
+      var milliseconds = B.JSInt_methods._tdivFast$1(duration._duration, 1000);
+      return A._TimerImpl$(milliseconds, callback);
     },
     _TimerImpl$(milliseconds, callback) {
       var t1 = new A._TimerImpl();
@@ -3571,6 +3615,7 @@
       this.callback = t0;
     },
     _TimerImpl: function _TimerImpl() {
+      this._handle = null;
     },
     _TimerImpl_internalCallback: function _TimerImpl_internalCallback(t0, t1) {
       this.$this = t0;
@@ -3611,6 +3656,20 @@
     LinkedHashMap_LinkedHashMap$_empty($K, $V) {
       return new A.JsLinkedHashMap($K._eval$1("@<0>")._bind$1($V)._eval$1("JsLinkedHashMap<1,2>"));
     },
+    LinkedHashSet_LinkedHashSet$_empty($E) {
+      return new A._LinkedHashSet($E._eval$1("_LinkedHashSet<0>"));
+    },
+    _LinkedHashSet__newHashTable() {
+      var table = Object.create(null);
+      table["<non-identifier-key>"] = table;
+      delete table["<non-identifier-key>"];
+      return table;
+    },
+    _LinkedHashSetIterator$(_set, _modifications, $E) {
+      var t1 = new A._LinkedHashSetIterator(_set, _modifications, $E._eval$1("_LinkedHashSetIterator<0>"));
+      t1._cell = _set._first;
+      return t1;
+    },
     LinkedHashMap_LinkedHashMap$from(other, $K, $V) {
       var result = A.LinkedHashMap_LinkedHashMap($K, $V);
       other.forEach$1(0, new A.LinkedHashMap_LinkedHashMap$from_closure(result, $K, $V));
@@ -3639,6 +3698,24 @@
       t1 = result._contents;
       return t1.charCodeAt(0) == 0 ? t1 : t1;
     },
+    _LinkedHashSet: function _LinkedHashSet(t0) {
+      var _ = this;
+      _._collection$_length = 0;
+      _._last = _._first = _._collection$_rest = _._nums = _._strings = null;
+      _._modifications = 0;
+      _.$ti = t0;
+    },
+    _LinkedHashSetCell: function _LinkedHashSetCell(t0) {
+      this._element = t0;
+      this._next = null;
+    },
+    _LinkedHashSetIterator: function _LinkedHashSetIterator(t0, t1, t2) {
+      var _ = this;
+      _._set = t0;
+      _._modifications = t1;
+      _._collection$_current = _._cell = null;
+      _.$ti = t2;
+    },
     LinkedHashMap_LinkedHashMap$from_closure: function LinkedHashMap_LinkedHashMap$from_closure(t0, t1, t2) {
       this.result = t0;
       this.K = t1;
@@ -3658,6 +3735,10 @@
     UnmodifiableMapBase: function UnmodifiableMapBase() {
     },
     _UnmodifiableMapMixin: function _UnmodifiableMapMixin() {
+    },
+    SetBase: function SetBase() {
+    },
+    _SetBase: function _SetBase() {
     },
     int_parse(source) {
       var value = A.Primitives_parseInt(source, null);
@@ -3681,11 +3762,14 @@
           result[i] = fill;
       return result;
     },
-    List_List$from(elements, $E) {
+    List_List$from(elements, growable, $E) {
       var t1,
         list = A._setArrayType([], $E._eval$1("JSArray<0>"));
       for (t1 = J.get$iterator$ax(elements); t1.moveNext$0();)
         B.JSArray_methods.add$1(list, $E._as(t1.get$current()));
+      if (growable)
+        return list;
+      list.$flags = 1;
       return list;
     },
     List_List$of(elements, growable, $E) {
@@ -3904,6 +3988,26 @@
         B.JSArray_methods.add$1(parts, elision);
       B.JSArray_methods.add$1(parts, penultimateString);
       B.JSArray_methods.add$1(parts, ultimateString);
+    },
+    Object_hash(object1, object2, object3, object4) {
+      var t1;
+      if (B.C_SentinelValue === object3) {
+        t1 = B.JSInt_methods.get$hashCode(object1);
+        object2 = J.get$hashCode$(object2);
+        return A.SystemHash_finish(A.SystemHash_combine(A.SystemHash_combine($.$get$_hashSeed(), t1), object2));
+      }
+      if (B.C_SentinelValue === object4) {
+        t1 = B.JSInt_methods.get$hashCode(object1);
+        object2 = J.get$hashCode$(object2);
+        object3 = J.get$hashCode$(object3);
+        return A.SystemHash_finish(A.SystemHash_combine(A.SystemHash_combine(A.SystemHash_combine($.$get$_hashSeed(), t1), object2), object3));
+      }
+      t1 = B.JSInt_methods.get$hashCode(object1);
+      object2 = J.get$hashCode$(object2);
+      object3 = J.get$hashCode$(object3);
+      object4 = J.get$hashCode$(object4);
+      object4 = A.SystemHash_finish(A.SystemHash_combine(A.SystemHash_combine(A.SystemHash_combine(A.SystemHash_combine($.$get$_hashSeed(), t1), object2), object3), object4));
+      return object4;
     },
     Duration: function Duration(t0) {
       this._duration = t0;
@@ -4828,6 +4932,39 @@
     chainCommands_closure: function chainCommands_closure(t0) {
       this.commands = t0;
     },
+    dropCursor(options) {
+      return A.Plugin$(new A.PluginSpec(null, null, null, new A.dropCursor_closure(options), B.Map_empty, type$.PluginSpec_dynamic), type$.dynamic);
+    },
+    DropCursorView$(editorView, options) {
+      var t1 = A._setArrayType([], type$.JSArray_Record_2_JavaScriptFunction_handler_and_String_name);
+      t1 = new A.DropCursorView(editorView, 1, "black", null, t1);
+      t1.DropCursorView$2(editorView, options);
+      return t1;
+    },
+    DropCursorOptions: function DropCursorOptions() {
+    },
+    dropCursor_closure: function dropCursor_closure(t0) {
+      this.options = t0;
+    },
+    DropCursorView: function DropCursorView(t0, t1, t2, t3, t4) {
+      var _ = this;
+      _.editorView = t0;
+      _.width = t1;
+      _.color = t2;
+      _.className = t3;
+      _.lastDragEvent = _.timeout = _.element = _.cursorPos = null;
+      _.handlers = t4;
+    },
+    DropCursorView_closure: function DropCursorView_closure(t0, t1) {
+      this.$this = t0;
+      this.name = t1;
+    },
+    DropCursorView_asPluginView_closure: function DropCursorView_asPluginView_closure(t0) {
+      this.$this = t0;
+    },
+    DropCursorView_scheduleRemoval_closure: function DropCursorView_scheduleRemoval_closure(t0) {
+      this.$this = t0;
+    },
     Branch$(items, eventCount) {
       return new A.Branch(items, eventCount);
     },
@@ -4951,8 +5088,9 @@
     history() {
       var t1 = $.$get$historyKey(),
         t2 = type$.String,
-        t3 = type$.dynamic;
-      return A.Plugin$(A.PluginSpec$(A.LinkedHashMap_LinkedHashMap$_literal(["config", B.C_HistoryOptions], t2, t3), t1, A.LinkedHashMap_LinkedHashMap$_literal(["handleDOMEvents", A.LinkedHashMap_LinkedHashMap$_literal(["beforeinput", new A.history_closure()], t2, type$.bool_Function_dynamic_dynamic)], t2, t3), new A.StateField(new A.history_closure0(), new A.history_closure1(B.C_HistoryOptions), type$.StateField_dynamic), t3), t3);
+        t3 = type$.dynamic,
+        t4 = A.LinkedHashMap_LinkedHashMap$_literal(["config", B.C_HistoryOptions], t2, t3);
+      return A.Plugin$(new A.PluginSpec(A.LinkedHashMap_LinkedHashMap$_literal(["handleDOMEvents", A.LinkedHashMap_LinkedHashMap$_literal(["beforeinput", new A.history_closure()], t2, type$.bool_Function_dynamic_dynamic)], t2, t3), new A.StateField(new A.history_closure0(), new A.history_closure1(B.C_HistoryOptions), type$.StateField_dynamic), t1, null, t4, type$.PluginSpec_dynamic), t3);
     },
     buildCommand(redoVal, $scroll) {
       return new A.buildCommand_closure(redoVal, true);
@@ -5058,7 +5196,7 @@
     normalize(map) {
       var t1, t2, norm,
         copy = A.LinkedHashMap_LinkedHashMap$_empty(type$.String, type$.bool_Function_EditorState_$opt_nullable_void_Function_Transaction_and_dynamic);
-      for (t1 = A.LinkedHashMapKeyIterator$(map, map._modifications, A._instanceType(map)._precomputed1); t1.moveNext$0();) {
+      for (t1 = A.LinkedHashMapKeyIterator$(map, map.__js_helper$_modifications, A._instanceType(map)._precomputed1); t1.moveNext$0();) {
         t2 = t1.__js_helper$_current;
         norm = A.normalizeKeyName(t2);
         if (copy.containsKey$1(norm))
@@ -5191,7 +5329,7 @@
       if (type != null)
         return A._setArrayType([type], type$.JSArray_NodeType);
       result = A._setArrayType([], type$.JSArray_NodeType);
-      for (t1 = A.LinkedHashMapKeyIterator$(types, types._modifications, A._instanceType(types)._precomputed1); t1.moveNext$0();) {
+      for (t1 = A.LinkedHashMapKeyIterator$(types, types.__js_helper$_modifications, A._instanceType(types)._precomputed1); t1.moveNext$0();) {
         t = types.$index(0, t1.__js_helper$_current);
         if (B.JSArray_methods.contains$1(t.groups, $name))
           B.JSArray_methods.add$1(result, t);
@@ -5462,7 +5600,7 @@
         insert = new A.DOMParser_schemaRules_insert(result),
         t1 = schema.__Schema_marks_F;
       t1 === $ && A.throwLateFieldNI("marks");
-      t2 = A.LinkedHashMapKeyIterator$(t1, t1._modifications, A._instanceType(t1)._precomputed1);
+      t2 = A.LinkedHashMapKeyIterator$(t1, t1.__js_helper$_modifications, A._instanceType(t1)._precomputed1);
       for (; t2.moveNext$0();) {
         t3 = t2.__js_helper$_current;
         parseDOM = t1.$index(0, t3).spec.parseDOM;
@@ -5476,7 +5614,7 @@
       }
       t1 = schema.__Schema_nodes_F;
       t1 === $ && A.throwLateFieldNI("nodes");
-      t2 = A.LinkedHashMapKeyIterator$(t1, t1._modifications, A._instanceType(t1)._precomputed1);
+      t2 = A.LinkedHashMapKeyIterator$(t1, t1.__js_helper$_modifications, A._instanceType(t1)._precomputed1);
       t3 = type$.TagParseRule;
       for (; t2.moveNext$0();) {
         t4 = t2.__js_helper$_current;
@@ -5554,7 +5692,7 @@
       var t2, t3, $parent, t4, seen,
         t1 = nodeType.schema.__Schema_nodes_F;
       t1 === $ && A.throwLateFieldNI("nodes");
-      for (t2 = A.LinkedHashMapKeyIterator$(t1, t1._modifications, A._instanceType(t1)._precomputed1), t3 = type$.JSArray_ContentMatch; t2.moveNext$0();) {
+      for (t2 = A.LinkedHashMapKeyIterator$(t1, t1.__js_helper$_modifications, A._instanceType(t1)._precomputed1), t3 = type$.JSArray_ContentMatch; t2.moveNext$0();) {
         $parent = t1.$index(0, t2.__js_helper$_current);
         t4 = $parent.markSet;
         if (!(t4 == null || B.JSArray_methods.contains$1(t4, markType)))
@@ -6072,7 +6210,7 @@
     _defaultAttrs(attrs) {
       var t1, t2, attr,
         defaults = A.LinkedHashMap_LinkedHashMap$_empty(type$.String, type$.dynamic);
-      for (t1 = A.LinkedHashMapKeyIterator$(attrs, attrs._modifications, A._instanceType(attrs)._precomputed1); t1.moveNext$0();) {
+      for (t1 = A.LinkedHashMapKeyIterator$(attrs, attrs.__js_helper$_modifications, A._instanceType(attrs)._precomputed1); t1.moveNext$0();) {
         t2 = t1.__js_helper$_current;
         attr = attrs.$index(0, t2);
         if (!attr.hasDefault)
@@ -6084,7 +6222,7 @@
     _computeAttrs(attrs, value) {
       var t1, t2, t3, given, attr,
         built = A.LinkedHashMap_LinkedHashMap$_empty(type$.String, type$.dynamic);
-      for (t1 = A.LinkedHashMapKeyIterator$(attrs, attrs._modifications, A._instanceType(attrs)._precomputed1), t2 = value == null; t1.moveNext$0();) {
+      for (t1 = A.LinkedHashMapKeyIterator$(attrs, attrs.__js_helper$_modifications, A._instanceType(attrs)._precomputed1), t2 = value == null; t1.moveNext$0();) {
         t3 = t1.__js_helper$_current;
         given = t2 ? null : value.$index(0, t3);
         if (given == null) {
@@ -6159,7 +6297,7 @@
         result = A.LinkedHashMap_LinkedHashMap$_empty(type$.String, type$.dynamic_Function_PMNode),
         t1 = schema.__Schema_nodes_F;
       t1 === $ && A.throwLateFieldNI("nodes");
-      t2 = A.LinkedHashMapKeyIterator$(t1, t1._modifications, A._instanceType(t1)._precomputed1);
+      t2 = A.LinkedHashMapKeyIterator$(t1, t1.__js_helper$_modifications, A._instanceType(t1)._precomputed1);
       for (; t2.moveNext$0();) {
         t3 = t2.__js_helper$_current;
         toDOM = t1.$index(0, t3).spec.toDOM;
@@ -6175,7 +6313,7 @@
         result = A.LinkedHashMap_LinkedHashMap$_empty(type$.String, type$.dynamic_Function_Mark_bool),
         t1 = schema.__Schema_marks_F;
       t1 === $ && A.throwLateFieldNI("marks");
-      t2 = A.LinkedHashMapKeyIterator$(t1, t1._modifications, A._instanceType(t1)._precomputed1);
+      t2 = A.LinkedHashMapKeyIterator$(t1, t1.__js_helper$_modifications, A._instanceType(t1)._precomputed1);
       for (; t2.moveNext$0();) {
         t3 = t2.__js_helper$_current;
         result.$indexSet(0, t3, t1.$index(0, t3).spec.toDOM);
@@ -6263,9 +6401,6 @@
     },
     DOMSerializer_nodesFromSchema_closure: function DOMSerializer_nodesFromSchema_closure() {
     },
-    PluginSpec$(extraProps, key, props, state, $T) {
-      return new A.PluginSpec(props, state, key, extraProps, $T._eval$1("PluginSpec<0>"));
-    },
     _createKey($name) {
       var t1, t2;
       if ($._pluginKeys.containsKey$1($name)) {
@@ -6285,8 +6420,10 @@
     },
     Plugin$(spec, $T) {
       var t1 = A.LinkedHashMap_LinkedHashMap$_empty(type$.String, type$.dynamic),
-        t2 = new A.Plugin(spec, t1, $T._eval$1("Plugin<0>"));
-      t1.addAll$1(0, spec.props);
+        t2 = new A.Plugin(spec, t1, $T._eval$1("Plugin<0>")),
+        t3 = spec.props;
+      if (t3 != null)
+        t1.addAll$1(0, t3);
       t1 = spec.key;
       if (t1 == null)
         t1 = null;
@@ -6297,18 +6434,23 @@
       t2.__Plugin_key_F = t1 == null ? A._createKey("plugin") : t1;
       return t2;
     },
+    PluginView: function PluginView(t0, t1) {
+      this.update = t0;
+      this.destroy = t1;
+    },
     StateField: function StateField(t0, t1, t2) {
       this.init = t0;
       this.apply = t1;
       this.$ti = t2;
     },
-    PluginSpec: function PluginSpec(t0, t1, t2, t3, t4) {
+    PluginSpec: function PluginSpec(t0, t1, t2, t3, t4, t5) {
       var _ = this;
       _.props = t0;
       _.state = t1;
       _.key = t2;
-      _.extraProps = t3;
-      _.$ti = t4;
+      _.view = t3;
+      _.extraProps = t4;
+      _.$ti = t5;
     },
     PluginKey: function PluginKey(t0) {
       this.__PluginKey_key_F = $;
@@ -6521,7 +6663,7 @@
     },
     Configuration_Configuration(schema, plugins) {
       var t1, _i, plugin, t2,
-        fields = A.List_List$from($.$get$_baseFields(), type$.FieldDesc),
+        fields = A.List_List$from($.$get$_baseFields(), true, type$.FieldDesc),
         currentPlugins = A._setArrayType([], type$.JSArray_Plugin_dynamic),
         pluginsByKey = A.LinkedHashMap_LinkedHashMap$_empty(type$.String, type$.Plugin_dynamic);
       for (t1 = plugins.length, _i = 0; _i < plugins.length; plugins.length === t1 || (0, A.throwConcurrentModificationError)(plugins), ++_i) {
@@ -8135,6 +8277,15 @@
           return index;
       }
     },
+    parentNode(node) {
+      var t1 = A.JSAnyUtilityExtension_instanceOfString(node, "Element"),
+        $parent = t1 ? type$.nullable_JSObject._as(node.assignedSlot) : null;
+      if ($parent == null)
+        $parent = type$.nullable_JSObject._as(node.parentNode);
+      if ($parent != null && A._asInt($parent.nodeType) === 11)
+        return type$.JSObject._as($parent.host);
+      return $parent;
+    },
     textRange(node, from, to) {
       var t1,
         range = $._reusedRange;
@@ -8258,6 +8409,39 @@
       }
       return elt;
     },
+    caretFromPoint(doc, x, y) {
+      var pos, node, offset, t1, offset0, t2, exception, range, _null = null,
+        docObj = doc;
+      if ("caretPositionFromPoint" in docObj)
+        try {
+          t1 = type$.nullable_JSObject;
+          pos = t1._as(A.JSObjectUnsafeUtilExtension__callMethod(docObj, "caretPositionFromPoint", x, y, _null, _null));
+          if (pos != null && pos != null) {
+            node = t1._as(pos.offsetNode);
+            t1 = A._asDoubleQ(pos.offset);
+            offset0 = t1 == null ? _null : A._asInt(t1);
+            offset = offset0 == null ? 0 : offset0;
+            if (node != null) {
+              t1 = offset;
+              t2 = A.nodeSize(node);
+              if (typeof t1 !== "number")
+                return t1.$lt();
+              t1 = t1 < t2 ? offset : A.nodeSize(node);
+              return new A.CaretPosition(node, t1);
+            }
+          }
+        } catch (exception) {
+        }
+      if ("caretRangeFromPoint" in docObj) {
+        range = type$.nullable_JSObject._as(A.JSObjectUnsafeUtilExtension__callMethod(docObj, "caretRangeFromPoint", x, y, _null, _null));
+        if (range != null) {
+          node = type$.JSObject._as(range.startContainer);
+          offset = A._asInt(range.startOffset);
+          return new A.CaretPosition(node, offset < A.nodeSize(node) ? offset : A.nodeSize(node));
+        }
+      }
+      return _null;
+    },
     DOMSelectionRange: function DOMSelectionRange(t0, t1, t2, t3) {
       var _ = this;
       _.focusNode = t0;
@@ -8265,8 +8449,353 @@
       _.anchorNode = t2;
       _.anchorOffset = t3;
     },
+    CaretPosition: function CaretPosition(t0, t1) {
+      this.node = t0;
+      this.offset = t1;
+    },
     _toRect(rect) {
       return new A.Rect(A._asDouble(rect.left), A._asDouble(rect.right), A._asDouble(rect.top), A._asDouble(rect.bottom));
+    },
+    findOffsetInNode(node, coords) {
+      var t1, child, t2, t3, coordsBelow, firstBelow, rowTop, rowBot0, coordsClosest, closest, dxClosest, offset, childIndex, rects, offset0, i, t4, t5, t6, t7, dx, _null = null,
+        rowBot = coords.top;
+      for (t1 = type$.nullable_JSObject, child = t1._as(node.firstChild), t2 = coords.left, t3 = type$.JSObject, coordsBelow = _null, firstBelow = coordsBelow, rowTop = rowBot, rowBot0 = rowTop, coordsClosest = firstBelow, closest = coordsClosest, dxClosest = 200000000, offset = 0, childIndex = 0; child != null; child = t1._as(child.nextSibling), ++childIndex) {
+        if (A._asInt(child.nodeType) === 1)
+          rects = t3._as(child.getClientRects());
+        else if (A._asInt(child.nodeType) === 3)
+          rects = t3._as(A.textRange(child, _null, _null).getClientRects());
+        else
+          continue;
+        for (offset0 = childIndex + 1, i = 0; i < A._asInt(rects.length); ++i) {
+          t4 = t1._as(rects.item(i));
+          t5 = A._asDouble(t4.left);
+          t6 = A._asDouble(t4.right);
+          t7 = A._asDouble(t4.top);
+          t4 = A._asDouble(t4.bottom);
+          if (t7 <= rowBot0 && t4 >= rowTop) {
+            rowBot0 = Math.max(t4, rowBot0);
+            rowTop = Math.min(t7, rowTop);
+            if (t5 > t2)
+              dx = t5 - t2;
+            else
+              dx = t6 < t2 ? t2 - t6 : 0;
+            if (dx < dxClosest) {
+              t4 = dx !== 0;
+              if (t4 && A._asInt(child.nodeType) === 3)
+                coordsClosest = new A.ViewCoords(t6 < t2 ? t6 : t5, rowBot);
+              else
+                coordsClosest = coords;
+              if (A._asInt(child.nodeType) === 1 && t4)
+                offset = childIndex + (t2 >= (t5 + t6) / 2 ? 1 : 0);
+              dxClosest = dx;
+              closest = child;
+              continue;
+            }
+          } else if (t7 > rowBot && firstBelow == null && t5 <= t2 && t6 >= t2) {
+            coordsBelow = new A.ViewCoords(Math.max(t5, Math.min(t6, t2)), t7);
+            firstBelow = child;
+          }
+          if (closest == null)
+            if (!(t2 >= t6 && rowBot >= t7))
+              t4 = t2 >= t5 && rowBot >= t4;
+            else
+              t4 = true;
+          else
+            t4 = false;
+          if (t4)
+            offset = offset0;
+        }
+      }
+      if (closest == null && firstBelow != null) {
+        coordsClosest = coordsBelow;
+        closest = firstBelow;
+        dxClosest = 0;
+      }
+      t1 = closest != null;
+      if (t1 && A._asInt(closest.nodeType) === 3) {
+        coordsClosest.toString;
+        return A.findOffsetInText(closest, coordsClosest);
+      }
+      if (t1)
+        t1 = dxClosest !== 0 && A._asInt(closest.nodeType) === 1;
+      else
+        t1 = true;
+      if (t1)
+        return new A.CaretPosition(node, offset);
+      coordsClosest.toString;
+      return A.findOffsetInNode(closest, coordsClosest);
+    },
+    findOffsetInText(node, coords) {
+      var result, i0, rect,
+        len = A._asStringQ(node.nodeValue).length,
+        t1 = type$.JSObject,
+        range = t1._as(t1._as(self.document).createRange()),
+        i = 0;
+      while (true) {
+        if (!(i < len)) {
+          result = null;
+          break;
+        }
+        c$0: {
+          i0 = i + 1;
+          range.setEnd(node, i0);
+          range.setStart(node, i);
+          rect = A.singleRect(range, 1);
+          if (rect.top === rect.bottom)
+            break c$0;
+          if (A.inRect(coords, rect)) {
+            result = new A.CaretPosition(node, i + (coords.left >= (rect.left + rect.right) / 2 ? 1 : 0));
+            break;
+          }
+        }
+        i = i0;
+      }
+      range.detach();
+      return result == null ? new A.CaretPosition(node, 0) : result;
+    },
+    inRect(coords, rect) {
+      var t1 = coords.left,
+        t2 = false;
+      if (t1 >= rect.left - 1)
+        if (t1 <= rect.right + 1) {
+          t1 = coords.top;
+          t1 = t1 >= rect.top - 1 && t1 <= rect.bottom + 1;
+        } else
+          t1 = t2;
+      else
+        t1 = t2;
+      return t1;
+    },
+    targetKludge(dom, coords) {
+      var t1, t2,
+        $parent = type$.nullable_JSObject._as(dom.parentNode);
+      if ($parent != null) {
+        t1 = A.RegExp_RegExp("^li$", false);
+        t2 = A._asString($parent.nodeName);
+        t1 = t1._nativeRegExp.test(t2) && coords.left < A._asDouble(type$.JSObject._as(dom.getBoundingClientRect()).left);
+      } else
+        t1 = false;
+      if (t1)
+        return $parent;
+      return dom;
+    },
+    posFromCaret(view, node, offset, coords) {
+      var t1, t2, t3, t4, cur, outsideBlock, sawBlock, t5, desc, descNode, t6, rect, t7, before, _null = null,
+        _s7_ = "isBlock";
+      for (t1 = type$.nullable_JSObject, t2 = type$.JSObject, t3 = coords.left, t4 = coords.top, cur = node, outsideBlock = -1, sawBlock = false; true; cur = t5) {
+        t5 = view.__EditorView_dom_F;
+        t5 === $ && A.throwLateFieldNI("dom");
+        if (cur === t5)
+          break;
+        t5 = view.__EditorView_docView_A;
+        t5 === $ && A.throwLateFieldNI("docView");
+        desc = t5.nearestDesc$2(cur, true);
+        if (desc == null)
+          return _null;
+        descNode = desc.get$node();
+        t5 = desc.dom;
+        if (A._asInt(t5.nodeType) === 1) {
+          if (descNode == null)
+            t6 = _null;
+          else {
+            t6 = descNode.type.__NodeType_isBlock_A;
+            t6 === $ && A.throwLateFieldNI(_s7_);
+          }
+          t6 = t6 === true && desc.parent != null || desc.contentDOM == null;
+        } else
+          t6 = false;
+        if (t6) {
+          rect = t2._as(t5.getBoundingClientRect());
+          if (A._asDouble(rect.width) !== 0 || A._asDouble(rect.height) !== 0) {
+            t5 = descNode == null;
+            if (t5)
+              t6 = _null;
+            else {
+              t6 = descNode.type.__NodeType_isBlock_A;
+              t6 === $ && A.throwLateFieldNI(_s7_);
+            }
+            t7 = false;
+            if (t6 === true)
+              if (desc.parent != null) {
+                t6 = A.RegExp_RegExp("^T(R|BODY|HEAD|FOOT)$", true);
+                t7 = A._asString(desc.dom.nodeName);
+                t6 = !t6._nativeRegExp.test(t7);
+              } else
+                t6 = t7;
+            else
+              t6 = t7;
+            if (t6) {
+              t6 = !sawBlock;
+              if (t6 && A._asDouble(rect.left) > t3 || A._asDouble(rect.top) > t4)
+                outsideBlock = desc.parent.posBeforeChild$1(desc);
+              else if (t6 && A._asDouble(rect.right) < t3 || A._asDouble(rect.bottom) < t4)
+                outsideBlock = desc.parent.posBeforeChild$1(desc) + desc.get$size();
+              sawBlock = true;
+            }
+            t6 = false;
+            if (desc.contentDOM == null)
+              if (outsideBlock < 0) {
+                if (t5)
+                  t6 = _null;
+                else {
+                  t6 = descNode.type.__NodeType_isText_A;
+                  t6 === $ && A.throwLateFieldNI("isText");
+                }
+                t6 = t6 !== true;
+              }
+            if (t6) {
+              if (t5)
+                t1 = _null;
+              else {
+                t1 = descNode.type.__NodeType_isBlock_A;
+                t1 === $ && A.throwLateFieldNI(_s7_);
+              }
+              before = t1 === true ? t4 < (A._asDouble(rect.top) + A._asDouble(rect.bottom)) / 2 : t3 < (A._asDouble(rect.left) + A._asDouble(rect.right)) / 2;
+              t1 = desc.parent;
+              return before ? t1.posBeforeChild$1(desc) : t1.posBeforeChild$1(desc) + desc.get$size();
+            }
+          }
+        }
+        t5 = t1._as(desc.dom.parentNode);
+        t5.toString;
+      }
+      if (outsideBlock > -1)
+        t1 = outsideBlock;
+      else {
+        t1 = view.__EditorView_docView_A;
+        t1 === $ && A.throwLateFieldNI("docView");
+        t1 = t1.posFromDOM$3(node, offset, -1);
+      }
+      return t1;
+    },
+    elementFromPoint(element, coords, box) {
+      var t2, startI, i, child, rects, j, t3, rect,
+        t1 = type$.JSObject,
+        len = A._asInt(t1._as(element.childNodes).length);
+      if (len > 0 && box.top < box.bottom) {
+        t2 = box.top;
+        startI = Math.max(0, Math.min(len - 1, B.JSNumber_methods.floor$0(len * (coords.top - t2) / (box.bottom - t2)) - 2));
+        for (t2 = type$.nullable_JSObject, i = startI; true;) {
+          child = t2._as(t1._as(element.childNodes).item(i));
+          if (A._asInt(child.nodeType) === 1) {
+            rects = t1._as(child.getClientRects());
+            for (j = 0; j < A._asInt(rects.length); ++j) {
+              t3 = t2._as(rects.item(j));
+              rect = new A.Rect(A._asDouble(t3.left), A._asDouble(t3.right), A._asDouble(t3.top), A._asDouble(t3.bottom));
+              if (A.inRect(coords, rect))
+                return A.elementFromPoint(child, coords, rect);
+            }
+          }
+          i = B.JSInt_methods.$mod(i + 1, len);
+          if (i === startI)
+            break;
+        }
+      }
+      return element;
+    },
+    posAtCoords(view, coords) {
+      var t2, t3, t4, t5, caret, node, offset, t6, root, pointSource, elt, box, p, next, offset0, prev, pos, found, rect, bias, desc, _null = null,
+        t1 = view.__EditorView_dom_F;
+      t1 === $ && A.throwLateFieldNI("dom");
+      t2 = type$.nullable_JSObject;
+      t3 = t2._as(t1.ownerDocument);
+      t3.toString;
+      t4 = coords.left;
+      t5 = coords.top;
+      caret = A.caretFromPoint(t3, t4, t5);
+      if (caret != null) {
+        node = caret.node;
+        offset = caret.offset;
+      } else {
+        node = _null;
+        offset = 0;
+      }
+      t6 = type$.JSObject;
+      root = t6._as(t6._as(t1.getRootNode()));
+      if ("elementFromPoint" in root)
+        pointSource = root;
+      else
+        pointSource = t3;
+      elt = t2._as(A.JSObjectUnsafeUtilExtension__callMethod(pointSource, "elementFromPoint", t4, t5, _null, _null));
+      if (elt != null) {
+        t3 = A._asInt(elt.nodeType) !== 1 ? t2._as(elt.parentNode) : elt;
+        t3 = !A._asBool(t1.contains(t3));
+      } else
+        t3 = true;
+      if (t3) {
+        box = A._toRect(t6._as(t1.getBoundingClientRect()));
+        if (!A.inRect(coords, box))
+          return _null;
+        elt = A.elementFromPoint(t1, coords, box);
+      }
+      if ($.$get$safari()) {
+        p = elt;
+        while (true) {
+          if (!(node != null && p != null))
+            break;
+          if (A.JSAnyUtilityExtension_instanceOfString(p, "HTMLElement") && A._asBool(p.draggable))
+            node = _null;
+          p = A.parentNode(p);
+        }
+      }
+      elt = A.targetKludge(elt, coords);
+      if (node != null) {
+        if ($.$get$gecko() && A._asInt(node.nodeType) === 1) {
+          offset = Math.min(offset, A._asInt(t6._as(node.childNodes).length));
+          if (offset < A._asInt(t6._as(node.childNodes).length)) {
+            next = t2._as(t6._as(node.childNodes).item(offset));
+            if (A._asString(next.nodeName) === "IMG") {
+              box = t6._as(next.getBoundingClientRect());
+              if (A._asDouble(box.right) <= t4 && A._asDouble(box.bottom) > t5)
+                ++offset;
+            }
+          }
+        }
+        if ($.$get$webkit() && offset > 0 && A._asInt(node.nodeType) === 1) {
+          offset0 = offset - 1;
+          prev = t2._as(t6._as(node.childNodes).item(offset0));
+          if (prev != null && A._asInt(prev.nodeType) === 1)
+            if (A._asString(prev.contentEditable) === "false" && A._asDouble(t6._as(prev.getBoundingClientRect()).top) >= t5)
+              offset = offset0;
+        }
+        t3 = false;
+        if (node === t1)
+          if (offset === A._asInt(t6._as(node.childNodes).length) - 1)
+            if (A._asInt(t2._as(node.lastChild).nodeType) === 1) {
+              t1 = t2._as(node.lastChild);
+              if (t1 == null)
+                t1 = t6._as(t1);
+              t1 = t5 > A._asDouble(t6._as(t1.getBoundingClientRect()).bottom);
+            } else
+              t1 = t3;
+          else
+            t1 = t3;
+        else
+          t1 = t3;
+        if (t1) {
+          t1 = view.state.__EditorState__doc_A;
+          t1 === $ && A.throwLateFieldNI("_doc");
+          pos = t1.content.size;
+        } else
+          pos = offset === 0 || A._asInt(node.nodeType) !== 1 || A._asString(t2._as(t6._as(node.childNodes).item(offset - 1)).nodeName) !== "BR" ? A.posFromCaret(view, node, offset, coords) : _null;
+      } else
+        pos = _null;
+      if (pos == null) {
+        found = A.findOffsetInNode(elt, coords);
+        node = found.node;
+        if (A._asInt(node.nodeType) === 1 && t2._as(node.firstChild) == null) {
+          rect = t6._as(node.getBoundingClientRect());
+          bias = A._asDouble(rect.left) !== A._asDouble(rect.right) && t4 > (A._asDouble(rect.left) + A._asDouble(rect.right)) / 2 ? 1 : -1;
+        } else
+          bias = -1;
+        t1 = view.__EditorView_docView_A;
+        t1 === $ && A.throwLateFieldNI("docView");
+        pos = t1.posFromDOM$3(node, found.offset, bias);
+      }
+      t1 = view.__EditorView_docView_A;
+      t1 === $ && A.throwLateFieldNI("docView");
+      desc = t1.nearestDesc$2(elt, true);
+      return new A.PosAtCoordsResult(pos, desc != null ? desc.get$posAtStart() - desc.get$border() : -1);
     },
     nonZero(rect) {
       return rect.top < rect.bottom || rect.left < rect.right;
@@ -8519,6 +9048,14 @@
       _.top = t2;
       _.bottom = t3;
     },
+    ViewCoords: function ViewCoords(t0, t1) {
+      this.left = t0;
+      this.top = t1;
+    },
+    PosAtCoordsResult: function PosAtCoordsResult(t0, t1) {
+      this.pos = t0;
+      this.inside = t1;
+    },
     endOfTextblockVertical_closure: function endOfTextblockVertical_closure(t0, t1, t2) {
       this.view = t0;
       this.$$pos = t1;
@@ -8560,7 +9097,8 @@
       this.to = t1;
     },
     EditorView$(place, props) {
-      var t1 = new A.EditorView(props.state, props, A.List_List$from(props.plugins, type$.Plugin_dynamic), A.LinkedHashMap_LinkedHashMap$_empty(type$.String, type$.dynamic));
+      var t1 = A._setArrayType([], type$.JSArray_PluginView);
+      t1 = new A.EditorView(props.state, props, A.List_List$from(props.plugins, true, type$.Plugin_dynamic), A.LinkedHashMap_LinkedHashMap$_empty(type$.String, type$.dynamic), t1);
       t1.EditorView$2(place, props);
       return t1;
     },
@@ -8609,7 +9147,7 @@
       _.nodeViews = t11;
       _.markViews = t12;
     },
-    EditorView: function EditorView(t0, t1, t2, t3) {
+    EditorView: function EditorView(t0, t1, t2, t3, t4) {
       var _ = this;
       _.__EditorView_dom_F = $;
       _.state = t0;
@@ -8619,7 +9157,8 @@
       _.focused = false;
       _.trackWrites = null;
       _.nodeViews = t3;
-      _.lastSelectedViewDesc = null;
+      _.dragging = _.lastSelectedViewDesc = null;
+      _.pluginViews = t4;
       _.__EditorView_editable_A = $;
     },
     EditorView_closure: function EditorView_closure(t0) {
@@ -8652,11 +9191,11 @@
       }
       t1 = view.__EditorView_input_A.eventHandlers;
       if (t1.__js_helper$_length > 0) {
-        t1._strings = t1._nums = t1.__js_helper$_rest = t1._first = t1._last = null;
+        t1.__js_helper$_strings = t1.__js_helper$_nums = t1.__js_helper$_rest = t1.__js_helper$_first = t1.__js_helper$_last = null;
         t1.__js_helper$_length = 0;
         t1._modified$0();
       }
-      for (t1 = $.$get$handlers(), t1 = A.LinkedHashMapKeyIterator$(t1, t1._modifications, A._instanceType(t1)._precomputed1), t2 = A._callDartFunctionFast1, t3 = type$.nullable_JSObject; t1.moveNext$0();) {
+      for (t1 = $.$get$handlers(), t1 = A.LinkedHashMapKeyIterator$(t1, t1.__js_helper$_modifications, A._instanceType(t1)._precomputed1), t2 = A._callDartFunctionFast1, t3 = type$.nullable_JSObject; t1.moveNext$0();) {
         t4 = t1.__js_helper$_current;
         t5 = new A.ensureListeners_closure(view);
         if (typeof t5 == "function")
@@ -9171,7 +9710,7 @@
           $top = new A.OuterDecoLevel(A._asString(attrs.$index(0, _s8_)), A.LinkedHashMap_LinkedHashMap$_empty(t1, t1));
           B.JSArray_methods.add$1(result, $top);
         }
-        for (t3 = new A.LinkedHashMapKeyIterator(attrs, attrs._modifications, A._instanceType(attrs)._eval$1("LinkedHashMapKeyIterator<1>")), t3._cell = attrs._first; t3.moveNext$0();) {
+        for (t3 = new A.LinkedHashMapKeyIterator(attrs, attrs.__js_helper$_modifications, A._instanceType(attrs)._eval$1("LinkedHashMapKeyIterator<1>")), t3.__js_helper$_cell = attrs.__js_helper$_first; t3.moveNext$0();) {
           t4 = t3.__js_helper$_current;
           val = attrs.$index(0, t4);
           if (val == null)
@@ -9238,12 +9777,12 @@
     },
     patchAttributes(dom, prev, cur) {
       var t1, t2, t3, t4, t5, prevList, curList, i, prevStyle, m, t6, curStyle, _s5_ = "class", _s5_0 = "style";
-      for (t1 = prev.attrs, t2 = A.LinkedHashMapKeyIterator$(t1, t1._modifications, A._instanceType(t1)._precomputed1), t3 = cur.attrs; t2.moveNext$0();) {
+      for (t1 = prev.attrs, t2 = A.LinkedHashMapKeyIterator$(t1, t1.__js_helper$_modifications, A._instanceType(t1)._precomputed1), t3 = cur.attrs; t2.moveNext$0();) {
         t4 = t2.__js_helper$_current;
         if (t4 !== "class" && t4 !== "style" && t4 !== "nodeName" && !t3.containsKey$1(t4))
           dom.removeAttribute(t4);
       }
-      for (t2 = A.LinkedHashMapKeyIterator$(t3, t3._modifications, A._instanceType(t3)._precomputed1); t2.moveNext$0();) {
+      for (t2 = A.LinkedHashMapKeyIterator$(t3, t3.__js_helper$_modifications, A._instanceType(t3)._precomputed1); t2.moveNext$0();) {
         t4 = t2.__js_helper$_current;
         if (t4 !== "class" && t4 !== "style" && t4 !== "nodeName" && t3.$index(0, t4) != t1.$index(0, t4)) {
           t5 = t3.$index(0, t4);
@@ -9718,6 +10257,9 @@
     DocumentExtension: function DocumentExtension(t0) {
       this.name = t0;
     },
+    DropcursorExtension: function DropcursorExtension(t0) {
+      this.name = t0;
+    },
     ItalicExtension: function ItalicExtension(t0) {
       this.name = t0;
     },
@@ -9732,7 +10274,7 @@
       this.name = t0;
     },
     main() {
-      var editor, t3, schema, t4, bindings, t5, bold, italic, $window,
+      var editor, t3, schema, t4, t5, bindings, t6, bold, italic, $window,
         _s8_ = "_plugins",
         t1 = self,
         t2 = type$.JSObject,
@@ -9740,33 +10282,34 @@
       if (element == null)
         element = t2._as(element);
       editor = new A.TiptapEditor();
-      t3 = new A.ExtensionManager(B.List_1Kb);
-      editor.__TiptapEditor_extensionManager_F = t3;
+      t3 = editor.__TiptapEditor_extensionManager_F = new A.ExtensionManager(B.List_SV3);
       schema = t3.createSchema$0();
-      t3 = type$.List_Plugin_dynamic;
-      t3._as(B.List_empty);
-      t4 = type$.String;
-      bindings = A.LinkedHashMap_LinkedHashMap$_empty(t4, type$.bool_Function_EditorState_$opt_nullable_void_Function_Transaction_and_dynamic);
-      t5 = $.$get$pcBaseKeymap();
-      bindings.addAll$1(0, t5);
-      t5 = schema.__Schema_marks_F;
-      t5 === $ && A.throwLateFieldNI("marks");
-      bold = t5.$index(0, "bold");
+      t3 = A.List_List$of(t3.createPlugins$0(), true, type$.Plugin_dynamic);
+      B.JSArray_methods.addAll$1(t3, B.List_empty);
+      t4 = type$.List_Plugin_dynamic;
+      t4._as(t3);
+      t5 = type$.String;
+      bindings = A.LinkedHashMap_LinkedHashMap$_empty(t5, type$.bool_Function_EditorState_$opt_nullable_void_Function_Transaction_and_dynamic);
+      t6 = $.$get$pcBaseKeymap();
+      bindings.addAll$1(0, t6);
+      t6 = schema.__Schema_marks_F;
+      t6 === $ && A.throwLateFieldNI("marks");
+      bold = t6.$index(0, "bold");
       if (bold != null)
         bindings.$indexSet(0, "Mod-b", A.toggleMark(bold));
-      italic = t5.$index(0, "italic");
+      italic = t6.$index(0, "italic");
       if (italic != null)
         bindings.$indexSet(0, "Mod-i", A.toggleMark(italic));
       bindings.$indexSet(0, "Mod-z", $.$get$undo());
-      t5 = $.$get$redo();
-      bindings.$indexSet(0, "Shift-Mod-z", t5);
-      bindings.$indexSet(0, "Mod-y", t5);
-      t5 = type$.dynamic;
-      t5 = A._setArrayType([A.history(), editor._nativeInlineShortcutPlugin$0(), A.Plugin$(A.PluginSpec$(B.Map_empty, null, A.LinkedHashMap_LinkedHashMap$_literal(["handleKeyDown", A.keydownHandler(bindings)], t4, t5), null, t5), t5)], type$.JSArray_Plugin_dynamic);
-      B.JSArray_methods.addAll$1(t5, B.List_empty);
-      t3._as(t5);
+      t6 = $.$get$redo();
+      bindings.$indexSet(0, "Shift-Mod-z", t6);
+      bindings.$indexSet(0, "Mod-y", t6);
+      t6 = type$.dynamic;
+      t6 = A._setArrayType([A.history(), editor._nativeInlineShortcutPlugin$0(), A.Plugin$(new A.PluginSpec(A.LinkedHashMap_LinkedHashMap$_literal(["handleKeyDown", A.keydownHandler(bindings)], t5, t6), null, null, null, B.Map_empty, type$.PluginSpec_dynamic), t6)], type$.JSArray_Plugin_dynamic);
+      B.JSArray_methods.addAll$1(t6, t3);
+      t4._as(t6);
       editor.__TiptapEditor__plugins_F !== $ && A.throwLateFieldAI(_s8_);
-      editor.set$__TiptapEditor__plugins_F(t5);
+      editor.set$__TiptapEditor__plugins_F(t6);
       t3 = schema.__Schema_topNodeType_F;
       t3 === $ && A.throwLateFieldNI("topNodeType");
       t3 = t3.createAndFill$0();
@@ -10420,6 +10963,20 @@
       }
       throw A.wrapException(A.UnsupportedError$("" + receiver + ".toInt()"));
     },
+    floor$0(receiver) {
+      var truncated, d;
+      if (receiver >= 0) {
+        if (receiver <= 2147483647)
+          return receiver | 0;
+      } else if (receiver >= -2147483648) {
+        truncated = receiver | 0;
+        return receiver === truncated ? truncated : truncated - 1;
+      }
+      d = Math.floor(receiver);
+      if (isFinite(d))
+        return d;
+      throw A.wrapException(A.UnsupportedError$("" + receiver + ".floor()"));
+    },
     toString$0(receiver) {
       if (receiver === 0 && 1 / receiver < 0)
         return "-0.0";
@@ -10693,6 +11250,7 @@
       return "LateInitializationError: " + this._message;
     }
   };
+  A.SentinelValue.prototype = {};
   A.EfficientLengthIterable.prototype = {};
   A.ListIterable.prototype = {
     get$iterator(_) {
@@ -10806,20 +11364,16 @@
   };
   A.MappedIterable.prototype = {
     get$iterator(_) {
-      var t1 = this.__internal$_iterable;
-      return new A.MappedIterator(t1.get$iterator(t1), this._f, A._instanceType(this)._eval$1("MappedIterator<1,2>"));
+      return new A.MappedIterator(J.get$iterator$ax(this.__internal$_iterable), this._f, A._instanceType(this)._eval$1("MappedIterator<1,2>"));
     },
     get$length(_) {
-      var t1 = this.__internal$_iterable;
-      return t1.get$length(t1);
+      return J.get$length$asx(this.__internal$_iterable);
     },
     get$isEmpty(_) {
-      var t1 = this.__internal$_iterable;
-      return t1.get$isEmpty(t1);
+      return J.get$isEmpty$asx(this.__internal$_iterable);
     },
     elementAt$1(_, index) {
-      var t1 = this.__internal$_iterable;
-      return this._f.call$1(t1.elementAt$1(t1, index));
+      return this._f.call$1(J.elementAt$1$ax(this.__internal$_iterable, index));
     }
   };
   A.EfficientLengthMappedIterable.prototype = {$isEfficientLengthIterable: 1};
@@ -10968,6 +11522,7 @@
     }
   };
   A.__CastListBase__CastIterableBase_ListMixin.prototype = {};
+  A._Record_2_handler_name.prototype = {$recipe: "+handler,name(1,2)", $shape: 1};
   A.ConstantMap.prototype = {
     toString$0(_) {
       return A.MapBase_mapToString(this);
@@ -11256,12 +11811,12 @@
     containsKey$1(key) {
       var strings, nums;
       if (typeof key == "string") {
-        strings = this._strings;
+        strings = this.__js_helper$_strings;
         if (strings == null)
           return false;
         return strings[key] != null;
       } else if (typeof key == "number" && (key & 0x3fffffff) === key) {
-        nums = this._nums;
+        nums = this.__js_helper$_nums;
         if (nums == null)
           return false;
         return nums[key] != null;
@@ -11280,14 +11835,14 @@
     $index(_, key) {
       var strings, cell, t1, nums, _null = null;
       if (typeof key == "string") {
-        strings = this._strings;
+        strings = this.__js_helper$_strings;
         if (strings == null)
           return _null;
         cell = strings[key];
         t1 = cell == null ? _null : cell.hashMapCellValue;
         return t1;
       } else if (typeof key == "number" && (key & 0x3fffffff) === key) {
-        nums = this._nums;
+        nums = this.__js_helper$_nums;
         if (nums == null)
           return _null;
         cell = nums[key];
@@ -11313,11 +11868,11 @@
       t1._precomputed1._as(key);
       t1._rest[1]._as(value);
       if (typeof key == "string") {
-        strings = _this._strings;
-        _this._addHashTableEntry$3(strings == null ? _this._strings = _this._newHashTable$0() : strings, key, value);
+        strings = _this.__js_helper$_strings;
+        _this.__js_helper$_addHashTableEntry$3(strings == null ? _this.__js_helper$_strings = _this._newHashTable$0() : strings, key, value);
       } else if (typeof key == "number" && (key & 0x3fffffff) === key) {
-        nums = _this._nums;
-        _this._addHashTableEntry$3(nums == null ? _this._nums = _this._newHashTable$0() : nums, key, value);
+        nums = _this.__js_helper$_nums;
+        _this.__js_helper$_addHashTableEntry$3(nums == null ? _this.__js_helper$_nums = _this._newHashTable$0() : nums, key, value);
       } else
         _this.internalSet$2(key, value);
     },
@@ -11332,49 +11887,49 @@
       hash = _this.internalComputeHashCode$1(key);
       bucket = rest[hash];
       if (bucket == null)
-        rest[hash] = [_this._newLinkedCell$2(key, value)];
+        rest[hash] = [_this.__js_helper$_newLinkedCell$2(key, value)];
       else {
         index = _this.internalFindBucketIndex$2(bucket, key);
         if (index >= 0)
           bucket[index].hashMapCellValue = value;
         else
-          bucket.push(_this._newLinkedCell$2(key, value));
+          bucket.push(_this.__js_helper$_newLinkedCell$2(key, value));
       }
     },
     forEach$1(_, action) {
       var cell, modifications, _this = this;
       A._instanceType(_this)._eval$1("~(1,2)")._as(action);
-      cell = _this._first;
-      modifications = _this._modifications;
+      cell = _this.__js_helper$_first;
+      modifications = _this.__js_helper$_modifications;
       for (; cell != null;) {
         action.call$2(cell.hashMapCellKey, cell.hashMapCellValue);
-        if (modifications !== _this._modifications)
+        if (modifications !== _this.__js_helper$_modifications)
           throw A.wrapException(A.ConcurrentModificationError$(_this));
-        cell = cell._next;
+        cell = cell.__js_helper$_next;
       }
     },
-    _addHashTableEntry$3(table, key, value) {
+    __js_helper$_addHashTableEntry$3(table, key, value) {
       var cell,
         t1 = A._instanceType(this);
       t1._precomputed1._as(key);
       t1._rest[1]._as(value);
       cell = table[key];
       if (cell == null)
-        table[key] = this._newLinkedCell$2(key, value);
+        table[key] = this.__js_helper$_newLinkedCell$2(key, value);
       else
         cell.hashMapCellValue = value;
     },
     _modified$0() {
-      this._modifications = this._modifications + 1 & 1073741823;
+      this.__js_helper$_modifications = this.__js_helper$_modifications + 1 & 1073741823;
     },
-    _newLinkedCell$2(key, value) {
+    __js_helper$_newLinkedCell$2(key, value) {
       var _this = this,
         t1 = A._instanceType(_this),
         cell = new A.LinkedHashMapCell(t1._precomputed1._as(key), t1._rest[1]._as(value));
-      if (_this._first == null)
-        _this._first = _this._last = cell;
+      if (_this.__js_helper$_first == null)
+        _this.__js_helper$_first = _this.__js_helper$_last = cell;
       else
-        _this._last = _this._last._next = cell;
+        _this.__js_helper$_last = _this.__js_helper$_last.__js_helper$_next = cell;
       ++_this.__js_helper$_length;
       _this._modified$0();
       return cell;
@@ -11434,8 +11989,8 @@
     },
     get$iterator(_) {
       var t1 = this._map,
-        t2 = new A.LinkedHashMapKeyIterator(t1, t1._modifications, this.$ti._eval$1("LinkedHashMapKeyIterator<1>"));
-      t2._cell = t1._first;
+        t2 = new A.LinkedHashMapKeyIterator(t1, t1.__js_helper$_modifications, this.$ti._eval$1("LinkedHashMapKeyIterator<1>"));
+      t2.__js_helper$_cell = t1.__js_helper$_first;
       return t2;
     },
     contains$1(_, element) {
@@ -11449,15 +12004,15 @@
     moveNext$0() {
       var cell, _this = this,
         t1 = _this._map;
-      if (_this._modifications !== t1._modifications)
+      if (_this.__js_helper$_modifications !== t1.__js_helper$_modifications)
         throw A.wrapException(A.ConcurrentModificationError$(t1));
-      cell = _this._cell;
+      cell = _this.__js_helper$_cell;
       if (cell == null) {
         _this.set$__js_helper$_current(null);
         return false;
       } else {
         _this.set$__js_helper$_current(cell.hashMapCellKey);
-        _this._cell = cell._next;
+        _this.__js_helper$_cell = cell.__js_helper$_next;
         return true;
       }
     },
@@ -11491,13 +12046,84 @@
     call$2(o, tag) {
       return this.getUnknownTag(o, tag);
     },
-    $signature: 56
+    $signature: 67
   };
   A.initHooks_closure1.prototype = {
     call$1(tag) {
       return this.prototypeForTag(A._asString(tag));
     },
-    $signature: 52
+    $signature: 55
+  };
+  A._Record.prototype = {
+    toString$0(_) {
+      return this._toString$1(false);
+    },
+    _toString$1(safe) {
+      var t2, separator, i, key, value,
+        keys = this._fieldKeys$0(),
+        values = this._getFieldValues$0(),
+        t1 = (safe ? "" + "Record " : "") + "(";
+      for (t2 = keys.length, separator = "", i = 0; i < t2; ++i, separator = ", ") {
+        t1 += separator;
+        key = keys[i];
+        if (typeof key == "string")
+          t1 = t1 + key + ": ";
+        if (!(i < values.length))
+          return A.ioore(values, i);
+        value = values[i];
+        t1 = safe ? t1 + A.Primitives_safeToString(value) : t1 + A.S(value);
+      }
+      t1 += ")";
+      return t1.charCodeAt(0) == 0 ? t1 : t1;
+    },
+    _fieldKeys$0() {
+      var t1,
+        shapeTag = this.$shape;
+      for (; $._Record__computedFieldKeys.length <= shapeTag;)
+        B.JSArray_methods.add$1($._Record__computedFieldKeys, null);
+      t1 = $._Record__computedFieldKeys[shapeTag];
+      if (t1 == null) {
+        t1 = this._computeFieldKeys$0();
+        B.JSArray_methods.$indexSet($._Record__computedFieldKeys, shapeTag, t1);
+      }
+      return t1;
+    },
+    _computeFieldKeys$0() {
+      var i, names, last,
+        recipe = this.$recipe,
+        position = recipe.indexOf("("),
+        joinedNames = recipe.substring(1, position),
+        fields = recipe.substring(position),
+        arity = fields === "()" ? 0 : fields.replace(/[^,]/g, "").length + 1,
+        result = A._setArrayType(new Array(arity), type$.JSArray_Object);
+      for (i = 0; i < arity; ++i)
+        result[i] = i;
+      if (joinedNames !== "") {
+        names = joinedNames.split(",");
+        i = names.length;
+        for (last = arity; i > 0;) {
+          --last;
+          --i;
+          B.JSArray_methods.$indexSet(result, last, names[i]);
+        }
+      }
+      result = A.List_List$from(result, false, type$.Object);
+      result.$flags = 3;
+      return result;
+    }
+  };
+  A._Record2.prototype = {
+    _getFieldValues$0() {
+      return [this._0, this._1];
+    },
+    $eq(_, other) {
+      if (other == null)
+        return false;
+      return other instanceof A._Record2 && this.$shape === other.$shape && J.$eq$(this._0, other._0) && J.$eq$(this._1, other._1);
+    },
+    get$hashCode(_) {
+      return A.Object_hash(this.$shape, this._0, this._1, B.C_SentinelValue);
+    }
   };
   A.JSSyntaxRegExp.prototype = {
     toString$0(_) {
@@ -11890,7 +12516,7 @@
       t2 = this.span;
       t1.firstChild ? t1.removeChild(t2) : t1.appendChild(t2);
     },
-    $signature: 51
+    $signature: 54
   };
   A._AsyncRun__scheduleImmediateJsOverride_internalCallback.prototype = {
     call$0() {
@@ -11907,14 +12533,25 @@
   A._TimerImpl.prototype = {
     _TimerImpl$2(milliseconds, callback) {
       if (self.setTimeout != null)
-        self.setTimeout(A.convertDartClosureToJS(new A._TimerImpl_internalCallback(this, callback), 0), milliseconds);
+        this._handle = self.setTimeout(A.convertDartClosureToJS(new A._TimerImpl_internalCallback(this, callback), 0), milliseconds);
       else
         throw A.wrapException(A.UnsupportedError$("`setTimeout()` not found."));
+    },
+    cancel$0() {
+      if (self.setTimeout != null) {
+        var t1 = this._handle;
+        if (t1 == null)
+          return;
+        self.clearTimeout(t1);
+        this._handle = null;
+      } else
+        throw A.wrapException(A.UnsupportedError$("Canceling a timer."));
     },
     $isTimer: 1
   };
   A._TimerImpl_internalCallback.prototype = {
     call$0() {
+      this.$this._handle = null;
       this.callback.call$0();
     },
     $signature: 2
@@ -12058,11 +12695,121 @@
     },
     $signature: 2
   };
+  A._LinkedHashSet.prototype = {
+    get$iterator(_) {
+      var _this = this,
+        t1 = new A._LinkedHashSetIterator(_this, _this._modifications, _this.$ti._eval$1("_LinkedHashSetIterator<1>"));
+      t1._cell = _this._first;
+      return t1;
+    },
+    get$length(_) {
+      return this._collection$_length;
+    },
+    get$isEmpty(_) {
+      return this._collection$_length === 0;
+    },
+    get$isNotEmpty(_) {
+      return this._collection$_length !== 0;
+    },
+    contains$1(_, object) {
+      var t1 = this._contains$1(object);
+      return t1;
+    },
+    _contains$1(object) {
+      var rest = this._collection$_rest;
+      if (rest == null)
+        return false;
+      return this._findBucketIndex$2(rest[object.get$hashCode(0) & 1073741823], object) >= 0;
+    },
+    add$1(_, element) {
+      var strings, nums, _this = this;
+      _this.$ti._precomputed1._as(element);
+      if (typeof element == "string" && element !== "__proto__") {
+        strings = _this._strings;
+        return _this._addHashTableEntry$2(strings == null ? _this._strings = A._LinkedHashSet__newHashTable() : strings, element);
+      } else if (typeof element == "number" && (element & 1073741823) === element) {
+        nums = _this._nums;
+        return _this._addHashTableEntry$2(nums == null ? _this._nums = A._LinkedHashSet__newHashTable() : nums, element);
+      } else
+        return _this._add$1(element);
+    },
+    _add$1(element) {
+      var rest, hash, bucket, _this = this;
+      _this.$ti._precomputed1._as(element);
+      rest = _this._collection$_rest;
+      if (rest == null)
+        rest = _this._collection$_rest = A._LinkedHashSet__newHashTable();
+      hash = J.get$hashCode$(element) & 1073741823;
+      bucket = rest[hash];
+      if (bucket == null)
+        rest[hash] = [_this._newLinkedCell$1(element)];
+      else {
+        if (_this._findBucketIndex$2(bucket, element) >= 0)
+          return false;
+        bucket.push(_this._newLinkedCell$1(element));
+      }
+      return true;
+    },
+    _addHashTableEntry$2(table, element) {
+      this.$ti._precomputed1._as(element);
+      if (type$.nullable__LinkedHashSetCell._as(table[element]) != null)
+        return false;
+      table[element] = this._newLinkedCell$1(element);
+      return true;
+    },
+    _newLinkedCell$1(element) {
+      var _this = this,
+        cell = new A._LinkedHashSetCell(_this.$ti._precomputed1._as(element));
+      if (_this._first == null)
+        _this._first = _this._last = cell;
+      else
+        _this._last = _this._last._next = cell;
+      ++_this._collection$_length;
+      _this._modifications = _this._modifications + 1 & 1073741823;
+      return cell;
+    },
+    _findBucketIndex$2(bucket, element) {
+      var $length, i;
+      if (bucket == null)
+        return -1;
+      $length = bucket.length;
+      for (i = 0; i < $length; ++i)
+        if (J.$eq$(bucket[i]._element, element))
+          return i;
+      return -1;
+    }
+  };
+  A._LinkedHashSetCell.prototype = {};
+  A._LinkedHashSetIterator.prototype = {
+    get$current() {
+      var t1 = this._collection$_current;
+      return t1 == null ? this.$ti._precomputed1._as(t1) : t1;
+    },
+    moveNext$0() {
+      var _this = this,
+        cell = _this._cell,
+        t1 = _this._set;
+      if (_this._modifications !== t1._modifications)
+        throw A.wrapException(A.ConcurrentModificationError$(t1));
+      else if (cell == null) {
+        _this.set$_collection$_current(null);
+        return false;
+      } else {
+        _this.set$_collection$_current(_this.$ti._eval$1("1?")._as(cell._element));
+        _this._cell = cell._next;
+        return true;
+      }
+    },
+    set$_collection$_current(_current) {
+      this._collection$_current = this.$ti._eval$1("1?")._as(_current);
+    },
+    $isIterator: 1
+  };
   A.LinkedHashMap_LinkedHashMap$from_closure.prototype = {
     call$2(k, v) {
       this.result.$indexSet(0, this.K._as(k), this.V._as(v));
     },
-    $signature: 65
+    $signature: 75
   };
   A.ListBase.prototype = {
     get$iterator(receiver) {
@@ -12200,10 +12947,37 @@
       t2 = A.S(v);
       t1._contents += t2;
     },
-    $signature: 25
+    $signature: 26
   };
   A.UnmodifiableMapBase.prototype = {};
   A._UnmodifiableMapMixin.prototype = {};
+  A.SetBase.prototype = {
+    get$isEmpty(_) {
+      return this._collection$_length === 0;
+    },
+    get$isNotEmpty(_) {
+      return this._collection$_length !== 0;
+    },
+    toString$0(_) {
+      return A.Iterable_iterableToFullString(this, "{", "}");
+    },
+    elementAt$1(_, index) {
+      var iterator, skipCount, t1, _this = this;
+      A.RangeError_checkNotNegative(index, "index");
+      iterator = A._LinkedHashSetIterator$(_this, _this._modifications, _this.$ti._precomputed1);
+      for (skipCount = index; iterator.moveNext$0();) {
+        if (skipCount === 0) {
+          t1 = iterator._collection$_current;
+          return t1 == null ? iterator.$ti._precomputed1._as(t1) : t1;
+        }
+        --skipCount;
+      }
+      throw A.wrapException(A.IndexError$withLength(index, index - skipCount, _this, null, "index"));
+    },
+    $isEfficientLengthIterable: 1,
+    $isIterable: 1
+  };
+  A._SetBase.prototype = {};
   A.Duration.prototype = {
     $eq(_, other) {
       if (other == null)
@@ -12217,15 +12991,16 @@
       return B.JSInt_methods.compareTo$1(this._duration, type$.Duration._as(other)._duration);
     },
     toString$0(_) {
-      var minutesPadding, seconds, secondsPadding,
+      var minutes, minutesPadding, seconds, secondsPadding,
         microseconds = this._duration,
-        microseconds0 = microseconds % 3600000000,
-        minutes = B.JSInt_methods._tdivFast$1(microseconds0, 60000000);
-      microseconds0 %= 60000000;
+        hours = B.JSInt_methods._tdivFast$1(microseconds, 3600000000);
+      microseconds %= 3600000000;
+      minutes = B.JSInt_methods._tdivFast$1(microseconds, 60000000);
+      microseconds %= 60000000;
       minutesPadding = minutes < 10 ? "0" : "";
-      seconds = B.JSInt_methods._tdivFast$1(microseconds0, 1000000);
+      seconds = B.JSInt_methods._tdivFast$1(microseconds, 1000000);
       secondsPadding = seconds < 10 ? "0" : "";
-      return "" + (microseconds / 3600000000 | 0) + ":" + minutesPadding + minutes + ":" + secondsPadding + seconds + "." + B.JSString_methods.padLeft$2(B.JSInt_methods.toString$0(microseconds0 % 1000000), 6, "0");
+      return "" + hours + ":" + minutesPadding + minutes + ":" + secondsPadding + seconds + "." + B.JSString_methods.padLeft$2(B.JSInt_methods.toString$0(microseconds % 1000000), 6, "0");
     },
     $isComparable: 1
   };
@@ -12783,7 +13558,7 @@
       t1 === $ && A.throwLateFieldNI("_doc");
       return t1.rangeHasMark$3(r.fromRes.pos, r.toRes.pos, this.markType);
     },
-    $signature: 54
+    $signature: 57
   };
   A.chainCommands_closure.prototype = {
     call$3(state, dispatch, view) {
@@ -12802,6 +13577,225 @@
       return this.call$3(state, dispatch, null);
     },
     $signature: 1
+  };
+  A.DropCursorOptions.prototype = {};
+  A.dropCursor_closure.prototype = {
+    call$1(view) {
+      return A.DropCursorView$(view, this.options).asPluginView$0();
+    },
+    $signature: 59
+  };
+  A.DropCursorView.prototype = {
+    DropCursorView$2(editorView, options) {
+      var t1, t2, t3, _i, $name, t4, result;
+      for (t1 = A._callDartFunctionFast1, t2 = this.editorView, t3 = this.handlers, _i = 0; _i < 4; ++_i) {
+        $name = B.List_dragover_dragend_drop_dragleave[_i];
+        t4 = new A.DropCursorView_closure(this, $name);
+        if (typeof t4 == "function")
+          A.throwExpression(A.ArgumentError$("Attempting to rewrap a JS function."));
+        result = function(_call, f) {
+          return function(arg1) {
+            return _call(f, arg1, arguments.length);
+          };
+        }(t1, t4);
+        result[$.$get$DART_CLOSURE_PROPERTY_NAME()] = t4;
+        t4 = t2.__EditorView_dom_F;
+        t4 === $ && A.throwLateFieldNI("dom");
+        t4.addEventListener($name, result);
+        B.JSArray_methods.add$1(t3, new A._Record_2_handler_name(result, $name));
+      }
+    },
+    asPluginView$0() {
+      return new A.PluginView(new A.DropCursorView_asPluginView_closure(this), this.get$destroy());
+    },
+    destroy$0() {
+      var t1, t2, t3, _i, entry, t4, _this = this;
+      for (t1 = _this.handlers, t2 = t1.length, t3 = _this.editorView, _i = 0; _i < t1.length; t1.length === t2 || (0, A.throwConcurrentModificationError)(t1), ++_i) {
+        entry = t1[_i];
+        t4 = t3.__EditorView_dom_F;
+        t4 === $ && A.throwLateFieldNI("dom");
+        t4.removeEventListener(entry._1, entry._0);
+      }
+      B.JSArray_methods.clear$0(t1);
+      t1 = _this.timeout;
+      if (t1 != null)
+        t1.cancel$0();
+      _this.removeElement$0();
+    },
+    update$2(view, prevState) {
+      var t1, t2, $event, target, _this = this;
+      if (_this.cursorPos != null) {
+        t1 = prevState.__EditorState__doc_A;
+        t1 === $ && A.throwLateFieldNI("_doc");
+        t2 = view.state.__EditorState__doc_A;
+        t2 === $ && A.throwLateFieldNI("_doc");
+        t2 = t1 === t2;
+        t1 = t2;
+      } else
+        t1 = true;
+      if (t1)
+        return;
+      $event = _this.lastDragEvent;
+      if ($event != null) {
+        target = _this.computeTarget$1($event);
+        if (target == _this.cursorPos)
+          _this.updateOverlay$0();
+        else
+          _this.setCursor$1(target);
+      } else
+        _this.updateOverlay$0();
+    },
+    _dropcursor$_handle$2($name, $event) {
+      var related, t1, _this = this;
+      switch ($name) {
+        case "dragover":
+          _this.dragover$1($event);
+          break;
+        case "dragend":
+          _this.scheduleRemoval$1(20);
+          break;
+        case "drop":
+          _this.scheduleRemoval$1(20);
+          break;
+        case "dragleave":
+          related = type$.nullable_JSObject._as($event.relatedTarget);
+          if (type$.JSObject._is(related)) {
+            t1 = _this.editorView.__EditorView_dom_F;
+            t1 === $ && A.throwLateFieldNI("dom");
+            t1 = !A._asBool(t1.contains(related));
+          } else
+            t1 = true;
+          if (t1)
+            _this.setCursor$1(null);
+          break;
+      }
+    },
+    setCursor$1(pos) {
+      var _this = this;
+      if (pos == _this.cursorPos)
+        return;
+      _this.cursorPos = pos;
+      if (pos == null)
+        _this.removeElement$0();
+      else
+        _this.updateOverlay$0();
+    },
+    removeElement$0() {
+      var dom = this.element;
+      if (dom != null && type$.nullable_JSObject._as(dom.parentNode) != null)
+        type$.JSObject._as(type$.nullable_JSObject._as(dom.parentNode).removeChild(dom));
+      this.element = null;
+    },
+    updateOverlay$0() {
+      var t1, t2, resolved, isBlock, coords, halfWidth, t3, t4, rect, doc, cursor, scrollX, scrollY, _this = this,
+        pos = _this.cursorPos;
+      if (pos == null)
+        return;
+      t1 = _this.editorView;
+      t2 = t1.state.__EditorState__doc_A;
+      t2 === $ && A.throwLateFieldNI("_doc");
+      resolved = A.ResolvedPos_resolveCached(t2, pos);
+      t2 = resolved.__ResolvedPos_depth_F;
+      t2 === $ && A.throwLateFieldNI("depth");
+      t2 = resolved.node$1(t2).type.__NodeType_inlineContent_A;
+      t2 === $ && A.throwLateFieldNI("inlineContent");
+      isBlock = !t2;
+      coords = A.coordsAtPos(t1, pos, 1);
+      halfWidth = _this.width / 2;
+      t3 = coords.left;
+      t4 = coords.top;
+      rect = isBlock ? new A.Rect(t3, coords.right, t4 - halfWidth, t4 + halfWidth) : new A.Rect(t3 - halfWidth, t3 + halfWidth, t4, coords.bottom);
+      t1 = t1.__EditorView_dom_F;
+      t1 === $ && A.throwLateFieldNI("dom");
+      t3 = type$.nullable_JSObject;
+      doc = t3._as(t1.ownerDocument);
+      if (doc == null)
+        doc = type$.JSObject._as(self.document);
+      t1 = t3._as(doc.body);
+      t1.toString;
+      cursor = _this.element;
+      if (cursor == null) {
+        t4 = type$.JSObject;
+        cursor = t4._as(t1.appendChild(t4._as(doc.createElement("div"))));
+        _this.set$element(cursor);
+      }
+      t1 = type$.JSObject;
+      t1._as(cursor.style).cssText = "position:absolute;z-index:50;pointer-events:none;";
+      t4 = _this.color;
+      if (t4.length !== 0)
+        t1._as(cursor.style).backgroundColor = t4;
+      A._asBool(t1._as(cursor.classList).toggle("prosemirror-dropcursor-block", isBlock));
+      A._asBool(t1._as(cursor.classList).toggle("prosemirror-dropcursor-inline", t2));
+      t2 = t3._as(doc.defaultView);
+      scrollX = t2 == null ? null : A._asDouble(t2.scrollX);
+      if (scrollX == null)
+        scrollX = 0;
+      t2 = t3._as(doc.defaultView);
+      scrollY = t2 == null ? null : A._asDouble(t2.scrollY);
+      if (scrollY == null)
+        scrollY = 0;
+      t2 = rect.left;
+      t1._as(cursor.style).left = A.S(t2 + scrollX) + "px";
+      t3 = rect.top;
+      t1._as(cursor.style).top = A.S(t3 + scrollY) + "px";
+      t1._as(cursor.style).width = A.S(rect.right - t2) + "px";
+      t1._as(cursor.style).height = A.S(rect.bottom - t3) + "px";
+    },
+    scheduleRemoval$1(milliseconds) {
+      var t1 = this.timeout;
+      if (t1 != null)
+        t1.cancel$0();
+      this.timeout = A.Timer_Timer(new A.Duration(1000 * milliseconds), new A.DropCursorView_scheduleRemoval_closure(this));
+    },
+    computeTarget$1($event) {
+      var t2, target,
+        t1 = this.editorView,
+        pos = A.posAtCoords(t1, new A.ViewCoords(A._asInt($event.clientX), A._asInt($event.clientY)));
+      if (pos == null)
+        return null;
+      t2 = pos.inside;
+      if (t2 >= 0) {
+        t1 = t1.state.__EditorState__doc_A;
+        t1 === $ && A.throwLateFieldNI("_doc");
+        t1.nodeAt$1(t2);
+      }
+      target = pos.pos;
+      return target;
+    },
+    dragover$1($event) {
+      var target, _this = this,
+        t1 = _this.editorView.__EditorView_editable_A;
+      t1 === $ && A.throwLateFieldNI("editable");
+      if (!t1)
+        return;
+      _this.lastDragEvent = $event;
+      target = _this.computeTarget$1($event);
+      if (target != null) {
+        _this.setCursor$1(target);
+        _this.scheduleRemoval$1(5000);
+      }
+    },
+    set$element(element) {
+      this.element = type$.nullable_JSObject._as(element);
+    }
+  };
+  A.DropCursorView_closure.prototype = {
+    call$1($event) {
+      return this.$this._dropcursor$_handle$2(this.name, type$.JSObject._as($event));
+    },
+    $signature: 61
+  };
+  A.DropCursorView_asPluginView_closure.prototype = {
+    call$2(view, prevState) {
+      return this.$this.update$2(view, prevState);
+    },
+    $signature: 64
+  };
+  A.DropCursorView_scheduleRemoval_closure.prototype = {
+    call$0() {
+      this.$this.setCursor$1(null);
+    },
+    $signature: 2
   };
   A.HistoryMeta.prototype = {};
   A.Item.prototype = {
@@ -13032,13 +14026,13 @@
       var t1 = $.$get$Branch_empty();
       return new A.HistoryState(t1, t1, null, 0, -1);
     },
-    $signature: 58
+    $signature: 68
   };
   A.history_closure1.prototype = {
     call$4(tr, hist, oldState, newState) {
       return A.applyTransaction(type$.HistoryState._as(hist), type$.EditorState._as(oldState), type$.Transaction._as(tr), this.config);
     },
-    $signature: 61
+    $signature: 71
   };
   A.history_closure.prototype = {
     call$2(view, e) {
@@ -13059,7 +14053,7 @@
       }
       return false;
     },
-    $signature: 64
+    $signature: 73
   };
   A.buildCommand_closure.prototype = {
     call$3(state, dispatch, view) {
@@ -13274,7 +14268,7 @@
       }
       return null;
     },
-    $signature: 68
+    $signature: 76
   };
   A.ContentMatch_fillBefore_search_closure.prototype = {
     call$1(tp) {
@@ -13282,7 +14276,7 @@
       t1.toString;
       return t1;
     },
-    $signature: 70
+    $signature: 21
   };
   A.ContentMatch_toString_scan.prototype = {
     call$1(m) {
@@ -13296,7 +14290,7 @@
           this.call$1(t2[i].next);
         }
     },
-    $signature: 72
+    $signature: 22
   };
   A.ContentMatch_toString_closure.prototype = {
     call$1(entry) {
@@ -13312,7 +14306,7 @@
       }
       return out;
     },
-    $signature: 73
+    $signature: 23
   };
   A._Active.prototype = {};
   A.TokenStream.prototype = {
@@ -13361,7 +14355,7 @@
       }
       return new A.NameExpr(type);
     },
-    $signature: 21
+    $signature: 24
   };
   A._Edge.prototype = {};
   A.nfa_node.prototype = {
@@ -13370,7 +14364,7 @@
       B.JSArray_methods.add$1(t1, A._setArrayType([], type$.JSArray__Edge));
       return t1.length - 1;
     },
-    $signature: 22
+    $signature: 25
   };
   A.nfa_edge.prototype = {
     call$3(from, to, term) {
@@ -13387,7 +14381,7 @@
     call$2(from, to) {
       return this.call$3(from, to, null);
     },
-    $signature: 23
+    $signature: 20
   };
   A.nfa_connect.prototype = {
     call$2(edges, to) {
@@ -13396,7 +14390,7 @@
       for (t1 = edges.length, _i = 0; _i < t1; ++_i)
         edges[_i].to = to;
     },
-    $signature: 24
+    $signature: 27
   };
   A.nfa_compile.prototype = {
     call$2(expr, from) {
@@ -13455,13 +14449,13 @@
       else
         throw A.wrapException(A.Exception_Exception("Unknown expr type"));
     },
-    $signature: 20
+    $signature: 28
   };
   A.nfa_compile_closure.prototype = {
     call$1(e) {
       return this.compile.call$2(type$.Expr._as(e), this._box_0.from);
     },
-    $signature: 26
+    $signature: 29
   };
   A.nullFrom_scan.prototype = {
     call$1(node) {
@@ -13494,7 +14488,7 @@
           _this.call$1(t3);
       }
     },
-    $signature: 27
+    $signature: 30
   };
   A.dfa_explore.prototype = {
     call$1(states) {
@@ -13563,7 +14557,7 @@
       }
       return state;
     },
-    $signature: 28
+    $signature: 31
   };
   A.Fragment.prototype = {
     nodesBetween$5(from, to, f, nodeStart, $parent) {
@@ -13764,7 +14758,7 @@
     call$2(sum, n) {
       return A._asInt(sum) + type$.PMNode._as(n).get$nodeSize();
     },
-    $signature: 29
+    $signature: 32
   };
   A.Fragment_textBetween_closure.prototype = {
     call$4(node, pos, $parent, index) {
@@ -13804,19 +14798,19 @@
       _this._box_0.text += nodeText;
       return null;
     },
-    $signature: 30
+    $signature: 33
   };
   A.Fragment_toStringInner_closure.prototype = {
     call$1(e) {
       return type$.PMNode._as(e).toString$0(0);
     },
-    $signature: 31
+    $signature: 34
   };
   A.Fragment_toJSON_closure.prototype = {
     call$1(n) {
       return type$.PMNode._as(n).toJSON$0();
     },
-    $signature: 32
+    $signature: 35
   };
   A.IndexOffset.prototype = {};
   A.ParseOptions.prototype = {};
@@ -13869,7 +14863,7 @@
       t1 === $ && A.throwLateFieldNI("contentMatch");
       return t1.matchType$1(node) != null;
     },
-    $signature: 33
+    $signature: 36
   };
   A.DOMParser_schemaRules_insert.prototype = {
     call$1(rule) {
@@ -13878,7 +14872,7 @@
         ;
       B.JSArray_methods.insert$2(t1, i, rule);
     },
-    $signature: 34
+    $signature: 37
   };
   A.NodeContext.prototype = {
     findWrapping$1(nodeType) {
@@ -14206,7 +15200,7 @@
         t2.toString;
         t2 = t1.$index(0, t2);
         t2.toString;
-        marks = A.List_List$from(marks, type$.Mark);
+        marks = A.List_List$from(marks, true, type$.Mark);
         B.JSArray_methods.add$1(marks, t2.create$1(rule.attrs));
         nodeType = null;
       }
@@ -14366,9 +15360,8 @@
       t1 = topContext.match;
       if (t1 != null)
         topContext.match = t1.matchType$1(type);
-      t1 = topContext.options;
-      options = A._wsOptionsFor(type, preserveWS, t1);
-      if ((t1 & 4) > 0 && topContext.content.length === 0)
+      options = A._wsOptionsFor(type, preserveWS, topContext.options);
+      if ((topContext.options & 4) > 0 && topContext.content.length === 0)
         options |= 4;
       t1 = type$.JSArray_Mark;
       applyMarks = A._setArrayType([], t1);
@@ -14509,7 +15502,7 @@
       var t2, type, t3,
         t1 = this.parser.schema.__Schema_nodes_F;
       t1 === $ && A.throwLateFieldNI("nodes");
-      t2 = A.LinkedHashMapKeyIterator$(t1, t1._modifications, A._instanceType(t1)._precomputed1);
+      t2 = A.LinkedHashMapKeyIterator$(t1, t1.__js_helper$_modifications, A._instanceType(t1)._precomputed1);
       for (; t2.moveNext$0();) {
         type = t1.$index(0, t2.__js_helper$_current);
         t3 = type.__NodeType_isBlock_A;
@@ -14548,7 +15541,7 @@
       }
       return false;
     },
-    $signature: 35
+    $signature: 38
   };
   A.Mark.prototype = {
     addToSet$1(set) {
@@ -14637,7 +15630,7 @@
       var t1 = type$.Mark;
       return B.JSInt_methods.compareTo$1(t1._as(a).type.rank, t1._as(b).type.rank);
     },
-    $signature: 36
+    $signature: 39
   };
   A.PMNode.prototype = {
     get$text() {
@@ -14831,7 +15824,7 @@
         obj.$indexSet(0, "attrs", t1);
       return obj;
     },
-    $signature: 37
+    $signature: 40
   };
   A.TextNode.prototype = {
     toString$0(_) {
@@ -15162,9 +16155,9 @@
     },
     hasRequiredAttrs$0() {
       var t1, t2, t3;
-      for (t1 = this.attrs.get$values(), t2 = t1.__internal$_iterable, t3 = A._instanceType(t1), t1 = new A.MappedIterator(t2.get$iterator(t2), t1._f, t3._eval$1("MappedIterator<1,2>")), t3 = t3._rest[1]; t1.moveNext$0();) {
-        t2 = t1.__internal$_current;
-        if (!(t2 == null ? t3._as(t2) : t2).hasDefault)
+      for (t1 = this.attrs.get$values(), t2 = A._instanceType(t1), t1 = new A.MappedIterator(J.get$iterator$ax(t1.__internal$_iterable), t1._f, t2._eval$1("MappedIterator<1,2>")), t2 = t2._rest[1]; t1.moveNext$0();) {
+        t3 = t1.__internal$_current;
+        if (!(t3 == null ? t2._as(t3) : t3).hasDefault)
           return true;
       }
       return false;
@@ -15288,7 +16281,7 @@
       this.result.$indexSet(0, $name, t3);
       return t3;
     },
-    $signature: 38
+    $signature: 41
   };
   A.MarkType.prototype = {
     create$1(attrsArgs) {
@@ -15337,7 +16330,7 @@
       this.result.$indexSet(0, $name, t1);
       return t1;
     },
-    $signature: 39
+    $signature: 42
   };
   A.Schema.prototype = {
     Schema$1(spec) {
@@ -15352,7 +16345,7 @@
       contentExprCache = A.LinkedHashMap_LinkedHashMap$_empty(type$.String, type$.ContentMatch);
       t1 = _this.__Schema_nodes_F;
       t1 === $ && A.throwLateFieldNI("nodes");
-      t2 = A.LinkedHashMapKeyIterator$(t1, t1._modifications, A._instanceType(t1)._precomputed1);
+      t2 = A.LinkedHashMapKeyIterator$(t1, t1.__js_helper$_modifications, A._instanceType(t1)._precomputed1);
       t3 = type$.JSArray_MarkType;
       for (; t2.moveNext$0();) {
         t4 = t2.__js_helper$_current;
@@ -15386,7 +16379,7 @@
       }
       t2 = _this.__Schema_marks_F;
       t2 === $ && A.throwLateFieldNI(_s5_);
-      t4 = A.LinkedHashMapKeyIterator$(t2, t2._modifications, A._instanceType(t2)._precomputed1);
+      t4 = A.LinkedHashMapKeyIterator$(t2, t2.__js_helper$_modifications, A._instanceType(t2)._precomputed1);
       t5 = type$.List_MarkType;
       for (; t4.moveNext$0();) {
         t6 = t2.$index(0, t4.__js_helper$_current);
@@ -15514,8 +16507,9 @@
     call$1(node) {
       return type$.PMNode._as(node).get$text();
     },
-    $signature: 40
+    $signature: 43
   };
+  A.PluginView.prototype = {};
   A.StateField.prototype = {};
   A.PluginSpec.prototype = {
     get$state() {
@@ -15676,7 +16670,7 @@
       }
       return t1;
     },
-    $signature: 41
+    $signature: 44
   };
   A._baseFields_closure0.prototype = {
     call$4(tr, value, oldState, newState) {
@@ -15688,7 +16682,7 @@
       t1._as(newState);
       return tr.doc;
     },
-    $signature: 42
+    $signature: 45
   };
   A._baseFields_closure1.prototype = {
     call$2(config, instance) {
@@ -15700,7 +16694,7 @@
       t1 = t2 == null ? A.AllSelection$(t1) : t2;
       return t1;
     },
-    $signature: 43
+    $signature: 46
   };
   A._baseFields_closure2.prototype = {
     call$4(tr, value, oldState, newState) {
@@ -15712,7 +16706,7 @@
       t1._as(newState);
       return tr.get$selection();
     },
-    $signature: 44
+    $signature: 47
   };
   A._baseFields_closure3.prototype = {
     call$2(config, instance) {
@@ -15720,7 +16714,7 @@
       type$.EditorState._as(instance);
       return null;
     },
-    $signature: 45
+    $signature: 48
   };
   A._baseFields_closure4.prototype = {
     call$4(tr, marks, oldState, newState) {
@@ -15733,7 +16727,7 @@
       t1 === $ && A.throwLateFieldNI("_selection");
       return t1 instanceof A.TextSelection && t1.get$empty() ? tr.storedMarks : null;
     },
-    $signature: 46
+    $signature: 49
   };
   A._baseFields_closure5.prototype = {
     call$2(config, instance) {
@@ -15741,7 +16735,7 @@
       type$.EditorState._as(instance);
       return 0;
     },
-    $signature: 47
+    $signature: 50
   };
   A._baseFields_closure6.prototype = {
     call$4(tr, prev, oldState, newState) {
@@ -15753,7 +16747,7 @@
       t1._as(newState);
       return (tr._updated & 4) > 0 ? prev + 1 : prev;
     },
-    $signature: 48
+    $signature: 51
   };
   A.Configuration.prototype = {};
   A.Configuration_Configuration_closure.prototype = {
@@ -15762,7 +16756,7 @@
       type$.EditorState._as(instance);
       return this.plugin.spec.state.init.call$2(config, instance);
     },
-    $signature: 75
+    $signature: 78
   };
   A.Configuration_Configuration_closure0.prototype = {
     call$4(tr, value, oldState, newState) {
@@ -15773,7 +16767,7 @@
       t1._as(newState);
       return this.plugin.spec.state.apply.call$4(tr, value, oldState, newState);
     },
-    $signature: 50
+    $signature: 53
   };
   A.EditorStateConfig.prototype = {};
   A.EditorState.prototype = {
@@ -16004,10 +16998,10 @@
     appendMap$2(map, mirrors) {
       var t1, t2, _this = this;
       if (!_this._ownData) {
-        _this.set$_maps(A.List_List$from(_this._maps, type$.StepMap));
+        _this.set$_maps(A.List_List$from(_this._maps, true, type$.StepMap));
         t1 = _this.mirror;
         if (t1 != null)
-          _this.set$mirror(A.List_List$from(t1, type$.int));
+          _this.set$mirror(A.List_List$from(t1, true, type$.int));
         _this._ownData = true;
       }
       B.JSArray_methods.add$1(_this._maps, map);
@@ -17108,7 +18102,7 @@
     call$1(m) {
       return type$.DecorationSource._as(m) instanceof A.DecorationSet;
     },
-    $signature: 53
+    $signature: 56
   };
   A.viewDecorations_closure.prototype = {
     call$1(f) {
@@ -17120,7 +18114,10 @@
     $signature: 5
   };
   A.DOMSelectionRange.prototype = {};
+  A.CaretPosition.prototype = {};
   A.Rect.prototype = {};
+  A.ViewCoords.prototype = {};
+  A.PosAtCoordsResult.prototype = {};
   A.endOfTextblockVertical_closure.prototype = {
     call$0() {
       var t3, t4, dom, nearest, t5, coords, child, boxes, i, box, t6,
@@ -17333,7 +18330,7 @@
       native = type$.JSArray_nullable_Object._as(t1.takeRecords());
       for (t1 = this.queue, t2 = type$.JSObject, i = 0; i < A._asInt(native.length); ++i)
         B.JSArray_methods.add$1(t1, A.ViewMutationRecord_ViewMutationRecord$fromMutation(t2._as(native[i])));
-      result = A.List_List$from(t1, type$.ViewMutationRecord);
+      result = A.List_List$from(t1, true, type$.ViewMutationRecord);
       B.JSArray_methods.clear$0(t1);
       return result;
     },
@@ -17374,7 +18371,7 @@
         B.JSArray_methods.add$1(t3, A.ViewMutationRecord_ViewMutationRecord$fromMutation(t1.get$current()));
       t2.flushSoon$0();
     },
-    $signature: 55
+    $signature: 58
   };
   A.DOMObserver_suppressSelectionUpdates_closure.prototype = {
     call$0() {
@@ -17416,9 +18413,10 @@
       _this.__EditorView_domObserver_F = t2;
       t2.start$0();
       A.ensureListeners(_this);
+      _this.updatePluginViews$0();
     },
     updateStateInner$2(newState, prevProps) {
-      var t2, updateSel, innerDeco, outerDeco, t3, updateDoc, t4, _this = this,
+      var t2, updateSel, innerDeco, outerDeco, t3, updateDoc, t4, _i, _this = this,
         _s10_ = "_selection",
         _s4_ = "_doc",
         prev = _this.state,
@@ -17474,6 +18472,8 @@
         A.selectionToDOM(_this, updateDoc);
         t1.start$0();
       }
+      for (t1 = _this.pluginViews, t2 = t1.length, _i = 0; _i < t1.length; t1.length === t2 || (0, A.throwConcurrentModificationError)(t1), ++_i)
+        t1[_i].update.call$2(_this, prev);
     },
     dispatch$1(tr) {
       type$.Transaction._as(tr);
@@ -17505,6 +18505,23 @@
         }
       }
       return null;
+    },
+    updatePluginViews$0() {
+      var t1, t2, _i, seen, plugin, createView, _this = this;
+      for (t1 = _this.pluginViews, t2 = t1.length, _i = 0; _i < t1.length; t1.length === t2 || (0, A.throwConcurrentModificationError)(t1), ++_i)
+        t1[_i].destroy.call$0();
+      _this.set$pluginViews(A._setArrayType([], type$.JSArray_PluginView));
+      t1 = type$.Plugin_dynamic;
+      seen = A.LinkedHashSet_LinkedHashSet$_empty(t1);
+      for (t1 = A.List_List$of(_this.directPlugins, true, t1), B.JSArray_methods.addAll$1(t1, _this.state.config.plugins), t2 = t1.length, _i = 0; _i < t1.length; t1.length === t2 || (0, A.throwConcurrentModificationError)(t1), ++_i) {
+        plugin = t1[_i];
+        if (seen.contains$1(0, plugin))
+          continue;
+        seen.add$1(0, plugin);
+        createView = plugin.spec.view;
+        if (createView != null)
+          B.JSArray_methods.add$1(_this.pluginViews, createView.call$1(_this));
+      }
     },
     get$editable() {
       var t1 = this.__EditorView_editable_A;
@@ -17566,6 +18583,9 @@
     set$nodeViews(nodeViews) {
       this.nodeViews = type$.Map_String_dynamic._as(nodeViews);
     },
+    set$pluginViews(pluginViews) {
+      this.pluginViews = type$.List_PluginView._as(pluginViews);
+    },
     get$state() {
       return this.state;
     }
@@ -17574,7 +18594,7 @@
     call$4(from, to, typeOver, added) {
       A.readDOMChange(this.$this, from, to, false, type$.List_JSObject._as(added));
     },
-    $signature: 57
+    $signature: 60
   };
   A.buildNodeViews_closure.prototype = {
     call$1(value) {
@@ -17736,6 +18756,7 @@
     call$2(view, $event) {
       type$.EditorView._as(view);
       type$.JSObject._as($event);
+      view.dragging = null;
       return false;
     },
     $signature: 0
@@ -17752,6 +18773,7 @@
     call$2(view, $event) {
       type$.EditorView._as(view);
       type$.JSObject._as($event);
+      view.dragging = null;
       return false;
     },
     $signature: 0
@@ -17796,7 +18818,7 @@
     call$1($event) {
       A.dispatchEvent(this.view, type$.JSObject._as($event));
     },
-    $signature: 59
+    $signature: 62
   };
   A.runCustomHandler_closure.prototype = {
     call$1(handlers) {
@@ -17841,7 +18863,7 @@
       }
       return result;
     },
-    $signature: 60
+    $signature: 63
   };
   A._RenderedMarkView.prototype = {$isMarkView: 1};
   A.DOMPosition.prototype = {};
@@ -17903,7 +18925,7 @@
       return this.get$posAtStart() + this.get$size() - 2 * this.get$border();
     },
     localPosFromDOM$3(dom, offset, bias) {
-      var t3, domAfter, cur, desc, atEnd, search, _this = this,
+      var t3, domBefore, cur, desc, domAfter, atEnd, search, _this = this, _null = null,
         t1 = _this.contentDOM,
         t2 = t1 != null;
       if (t2) {
@@ -17911,40 +18933,69 @@
         t3 = A._asBool(t1.contains(t3));
       } else
         t3 = false;
-      if (t3) {
-        if (dom === t1)
-          domAfter = type$.nullable_JSObject._as(type$.JSObject._as(dom.childNodes).item(offset));
-        else {
-          for (t2 = type$.nullable_JSObject, cur = dom; !J.$eq$(t2._as(cur.parentNode), t1); cur = t3) {
-            t3 = t2._as(cur.parentNode);
-            t3.toString;
+      if (t3)
+        if (bias < 0) {
+          if (dom === t1)
+            domBefore = offset > 0 ? type$.nullable_JSObject._as(type$.JSObject._as(dom.childNodes).item(offset - 1)) : _null;
+          else {
+            for (t2 = type$.nullable_JSObject, cur = dom; !J.$eq$(t2._as(cur.parentNode), t1); cur = t3) {
+              t3 = t2._as(cur.parentNode);
+              t3.toString;
+            }
+            domBefore = t2._as(cur.previousSibling);
           }
-          domAfter = t2._as(cur.nextSibling);
-        }
-        t1 = type$.nullable_JSObject;
-        while (true) {
-          t2 = domAfter != null;
-          if (!t2) {
-            desc = null;
-            break;
+          t1 = type$.nullable_JSObject;
+          while (true) {
+            t2 = domBefore != null;
+            if (!t2) {
+              desc = _null;
+              break;
+            }
+            desc = A.PmViewDescProp_get_pmViewDesc(domBefore);
+            if (desc != null && desc.parent === _this)
+              break;
+            domBefore = t1._as(domBefore.previousSibling);
           }
-          desc = A.PmViewDescProp_get_pmViewDesc(domAfter);
-          if (desc != null && desc.parent === _this)
-            break;
-          domAfter = t1._as(domAfter.nextSibling);
+          if (t2) {
+            desc.toString;
+            t1 = _this.posBeforeChild$1(desc) + desc.get$size();
+          } else
+            t1 = _this.get$posAtStart();
+          return t1;
+        } else {
+          if (dom === t1)
+            domAfter = type$.nullable_JSObject._as(type$.JSObject._as(dom.childNodes).item(offset));
+          else {
+            for (t2 = type$.nullable_JSObject, cur = dom; !J.$eq$(t2._as(cur.parentNode), t1); cur = t3) {
+              t3 = t2._as(cur.parentNode);
+              t3.toString;
+            }
+            domAfter = t2._as(cur.nextSibling);
+          }
+          t1 = type$.nullable_JSObject;
+          while (true) {
+            t2 = domAfter != null;
+            if (!t2) {
+              desc = _null;
+              break;
+            }
+            desc = A.PmViewDescProp_get_pmViewDesc(domAfter);
+            if (desc != null && desc.parent === _this)
+              break;
+            domAfter = t1._as(domAfter.nextSibling);
+          }
+          if (t2) {
+            desc.toString;
+            t1 = _this.posBeforeChild$1(desc);
+          } else
+            t1 = _this.get$posAtEnd();
+          return t1;
         }
-        if (t2) {
-          desc.toString;
-          t1 = _this.posBeforeChild$1(desc);
-        } else
-          t1 = _this.get$posAtEnd();
-        return t1;
-      }
       t3 = _this.dom;
       if (dom === t3 && t2)
         atEnd = offset > A.domIndex(t1);
       else {
-        atEnd = null;
+        atEnd = _null;
         if (t2 && t1 !== t3 && A._asBool(t3.contains(t1))) {
           t1.toString;
           atEnd = (A._asInt(dom.compareDocumentPosition(t1)) & 2) !== 0;
@@ -18671,7 +19722,7 @@
         t1.changed = true;
       }
     },
-    $signature: 62
+    $signature: 65
   };
   A.NodeViewDesc_updateChildren_closure0.prototype = {
     call$4(child, outerDeco, innerDeco, i) {
@@ -18708,7 +19759,7 @@
       t1 = _this._box_0;
       t1.off = t1.off + child.get$nodeSize();
     },
-    $signature: 63
+    $signature: 66
   };
   A.TextViewDesc.prototype = {
     update$4(node, outerDeco, innerDeco, view) {
@@ -19137,17 +20188,22 @@
       return A._asString(wrap.innerHTML);
     },
     setEditable$1(editable) {
-      var t1, t2, t3, _this = this;
+      var t1, t2, t3, t4, t5, _this = this;
       if (_this._editable === editable)
         return;
       _this._editable = editable;
       t1 = _this.view;
       if (t1 != null) {
-        t2 = t1._props = _this._viewProps$0();
-        t3 = t1.directPlugins;
-        B.JSArray_methods.clear$0(t3);
-        B.JSArray_methods.addAll$1(t3, t2.plugins);
+        t2 = _this._viewProps$0();
+        t3 = t2.plugins;
+        t4 = t1._props;
+        t1._props = t2;
+        t5 = t1.directPlugins;
+        B.JSArray_methods.clear$0(t5);
+        B.JSArray_methods.addAll$1(t5, t3);
         t1.updateStateInner$2(t2.state, t1._props);
+        if (t3 !== t4.plugins)
+          t1.updatePluginViews$0();
       }
     },
     _viewProps$0() {
@@ -19160,7 +20216,7 @@
     },
     _nativeInlineShortcutPlugin$0() {
       var t1 = type$.dynamic;
-      return A.Plugin$(A.PluginSpec$(B.Map_empty, null, A.LinkedHashMap_LinkedHashMap$_literal(["handleKeyDown", new A.TiptapEditor__nativeInlineShortcutPlugin_closure()], type$.String, t1), null, t1), t1);
+      return A.Plugin$(new A.PluginSpec(A.LinkedHashMap_LinkedHashMap$_literal(["handleKeyDown", new A.TiptapEditor__nativeInlineShortcutPlugin_closure()], type$.String, t1), null, null, null, B.Map_empty, type$.PluginSpec_dynamic), t1);
     },
     set$__TiptapEditor__plugins_F(__TiptapEditor__plugins_F) {
       this.__TiptapEditor__plugins_F = type$.List_Plugin_dynamic._as(__TiptapEditor__plugins_F);
@@ -19171,7 +20227,7 @@
       type$.EditorState._as(_);
       return this.$this._editable;
     },
-    $signature: 66
+    $signature: 69
   };
   A.TiptapEditor__viewProps_closure.prototype = {
     call$1(tr) {
@@ -19211,7 +20267,11 @@
     $signature: 9
   };
   A.AnyExtension.prototype = {};
-  A.Extension.prototype = {};
+  A.Extension.prototype = {
+    addPlugins$0() {
+      return B.List_empty;
+    }
+  };
   A.NodeExtension.prototype = {};
   A.MarkExtension.prototype = {};
   A.ExtensionManager.prototype = {
@@ -19220,7 +20280,7 @@
         t1 = type$.String,
         nodes = A.LinkedHashMap_LinkedHashMap$_empty(t1, type$.NodeSpec),
         marks = A.LinkedHashMap_LinkedHashMap$_empty(t1, type$.MarkSpec);
-      for (t2 = this.extensions, _i = 0; _i < 5; ++_i) {
+      for (t2 = this.extensions, _i = 0; _i < 6; ++_i) {
         extension = t2[_i];
         if (extension instanceof A.NodeExtension)
           nodes.$indexSet(0, extension.name, extension.config$0());
@@ -19231,6 +20291,13 @@
       t1 = new A.Schema(t2, A.LinkedHashMap_LinkedHashMap$_empty(t1, type$.dynamic));
       t1.Schema$1(t2);
       return t1;
+    },
+    createPlugins$0() {
+      var t1, _i,
+        plugins = A._setArrayType([], type$.JSArray_Plugin_dynamic);
+      for (t1 = this.extensions, _i = 0; _i < 6; ++_i)
+        B.JSArray_methods.addAll$1(plugins, t1[_i].addPlugins$0());
+      return plugins;
     }
   };
   A.BoldExtension.prototype = {
@@ -19246,7 +20313,7 @@
         return B.Map_empty;
       return false;
     },
-    $signature: 67
+    $signature: 70
   };
   A.BoldExtension_config_closure0.prototype = {
     call$2(mark, inline) {
@@ -19260,6 +20327,11 @@
     config$0() {
       var _null = null;
       return A.NodeSpec$("block+", _null, _null, _null, _null);
+    }
+  };
+  A.DropcursorExtension.prototype = {
+    addPlugins$0() {
+      return A._setArrayType([A.dropCursor(B.C_DropCursorOptions)], type$.JSArray_Plugin_dynamic);
     }
   };
   A.ItalicExtension.prototype = {
@@ -19287,7 +20359,7 @@
       type$.PMNode._as(node);
       return A._setArrayType(["p", 0], type$.JSArray_Object);
     },
-    $signature: 69
+    $signature: 72
   };
   A.TextExtension.prototype = {
     config$0() {
@@ -19314,7 +20386,7 @@
     call$1(editable) {
       return this.editor.setEditable$1(A._asBool(editable));
     },
-    $signature: 71
+    $signature: 74
   };
   (function aliases() {
     var _ = J.LegacyJavaScriptObject.prototype;
@@ -19391,9 +20463,10 @@
     }, function(state, dispatch) {
       return A.selectAll(state, dispatch, null);
     }], 1, 0);
-    _static_2(A, "content___cmp$closure", "_cmp", 74);
+    _instance_0_u(A.DropCursorView.prototype, "get$destroy", "destroy$0", 2);
+    _static_2(A, "content___cmp$closure", "_cmp", 77);
     _static_1(A, "decoration_InlineType_isInline$closure", "InlineType_isInline", 16);
-    _static_2(A, "decoration__byPos$closure", "byPos", 49);
+    _static_2(A, "decoration__byPos$closure", "byPos", 52);
     _instance_0_u(A.DOMObserver.prototype, "get$flush", "flush$0", 2);
     _instance_1_u(A.EditorView.prototype, "get$dispatch", "dispatch$1", 13);
   })();
@@ -19402,7 +20475,7 @@
       _inherit = hunkHelpers.inherit,
       _inheritMany = hunkHelpers.inheritMany;
     _inherit(A.Object, null);
-    _inheritMany(A.Object, [A.JS_CONST, J.Interceptor, J.ArrayIterator, A.Iterable, A.CastIterator, A.Closure, A.Error, A.ListIterator, A.MappedIterator, A.WhereIterator, A.ExpandIterator, A.EmptyIterator, A.FixedLengthListMixin, A.MapBase, A.ConstantMap, A._KeysOrValuesOrElementsIterator, A.TypeErrorDecoder, A.NullThrownFromJavaScriptException, A._StackTrace, A.LinkedHashMapCell, A.LinkedHashMapKeyIterator, A.JSSyntaxRegExp, A._MatchImplementation, A._AllMatchesIterator, A.StringMatch, A._StringAllMatchesIterator, A.Rti, A._FunctionParameters, A._Type, A._TimerImpl, A._SyncStarIterator, A._AsyncCallbackEntry, A._Zone, A.ListBase, A._UnmodifiableMapMixin, A.Duration, A.OutOfMemoryError, A.StackOverflowError, A._Exception, A.FormatException, A.MapEntry, A.Null, A.StringBuffer, A.Expando, A.HistoryMeta, A.Item, A.Branch, A.PopEventResult, A.HistoryState, A.HistoryOptions, A.MatchEdge, A.ContentMatch, A._Active, A.TokenStream, A.Expr, A._Edge, A.Fragment, A.IndexOffset, A.ParseOptions, A.ParseRule, A.DOMParser, A.NodeContext, A.ParseContext, A.Mark, A.PMNode, A.Slice, A._PreparedSlice, A.ResolvedPos, A.ResolveCache, A.NodeRange, A.NodeType, A.MarkType, A.Schema, A.SchemaSpec, A.NodeSpec, A.MarkSpec, A.DOMSerializer, A.StateField, A.PluginSpec, A.PluginKey, A.Plugin, A.SelectionRange, A.Selection, A.TextBookmark, A.NodeBookmark, A.FieldDesc, A.Configuration, A.EditorStateConfig, A.EditorState, A._TransactionResult, A.Transform, A.MapResult, A.StepMap, A.Mapping, A._MatchedMark, A.Step, A._Fittable, A._FrontierNode, A._Fitter, A._CloseLevel, A.StepResult, A.Wrapping, A.NodeTypeDecoration, A.Decoration, A.DecorationSet, A.DecorationGroup, A.DOMSelectionRange, A.Rect, A.SelectionState, A.DOMObserver, A.MutationRange, A.EditorProps, A.EditorView, A.LastClick, A.InputState, A.MouseDown, A.ViewMutationRecord, A._RenderedMarkView, A.DOMPosition, A.ParseRangeResult, A.ViewDesc, A.OuterDecoLevel, A._PreMatch, A.ViewTreeUpdater, A.TiptapEditor, A.AnyExtension, A.ExtensionManager]);
+    _inheritMany(A.Object, [A.JS_CONST, J.Interceptor, J.ArrayIterator, A.Iterable, A.CastIterator, A.Closure, A.Error, A.SentinelValue, A.ListIterator, A.MappedIterator, A.WhereIterator, A.ExpandIterator, A.EmptyIterator, A.FixedLengthListMixin, A.MapBase, A._Record, A.ConstantMap, A._KeysOrValuesOrElementsIterator, A.TypeErrorDecoder, A.NullThrownFromJavaScriptException, A._StackTrace, A.LinkedHashMapCell, A.LinkedHashMapKeyIterator, A.JSSyntaxRegExp, A._MatchImplementation, A._AllMatchesIterator, A.StringMatch, A._StringAllMatchesIterator, A.Rti, A._FunctionParameters, A._Type, A._TimerImpl, A._SyncStarIterator, A._AsyncCallbackEntry, A._Zone, A.SetBase, A._LinkedHashSetCell, A._LinkedHashSetIterator, A.ListBase, A._UnmodifiableMapMixin, A.Duration, A.OutOfMemoryError, A.StackOverflowError, A._Exception, A.FormatException, A.MapEntry, A.Null, A.StringBuffer, A.Expando, A.DropCursorOptions, A.DropCursorView, A.HistoryMeta, A.Item, A.Branch, A.PopEventResult, A.HistoryState, A.HistoryOptions, A.MatchEdge, A.ContentMatch, A._Active, A.TokenStream, A.Expr, A._Edge, A.Fragment, A.IndexOffset, A.ParseOptions, A.ParseRule, A.DOMParser, A.NodeContext, A.ParseContext, A.Mark, A.PMNode, A.Slice, A._PreparedSlice, A.ResolvedPos, A.ResolveCache, A.NodeRange, A.NodeType, A.MarkType, A.Schema, A.SchemaSpec, A.NodeSpec, A.MarkSpec, A.DOMSerializer, A.PluginView, A.StateField, A.PluginSpec, A.PluginKey, A.Plugin, A.SelectionRange, A.Selection, A.TextBookmark, A.NodeBookmark, A.FieldDesc, A.Configuration, A.EditorStateConfig, A.EditorState, A._TransactionResult, A.Transform, A.MapResult, A.StepMap, A.Mapping, A._MatchedMark, A.Step, A._Fittable, A._FrontierNode, A._Fitter, A._CloseLevel, A.StepResult, A.Wrapping, A.NodeTypeDecoration, A.Decoration, A.DecorationSet, A.DecorationGroup, A.DOMSelectionRange, A.CaretPosition, A.Rect, A.ViewCoords, A.PosAtCoordsResult, A.SelectionState, A.DOMObserver, A.MutationRange, A.EditorProps, A.EditorView, A.LastClick, A.InputState, A.MouseDown, A.ViewMutationRecord, A._RenderedMarkView, A.DOMPosition, A.ParseRangeResult, A.ViewDesc, A.OuterDecoLevel, A._PreMatch, A.ViewTreeUpdater, A.TiptapEditor, A.AnyExtension, A.ExtensionManager]);
     _inheritMany(J.Interceptor, [J.JSBool, J.JSNull, J.JavaScriptObject, J.JavaScriptBigInt, J.JavaScriptSymbol, J.JSNumber, J.JSString]);
     _inheritMany(J.JavaScriptObject, [J.LegacyJavaScriptObject, J.JSArray, A.NativeByteBuffer, A.NativeTypedData]);
     _inheritMany(J.LegacyJavaScriptObject, [J.PlainJavaScriptObject, J.UnknownJavaScriptObject, J.JavaScriptFunction]);
@@ -19412,8 +20485,8 @@
     _inheritMany(A._CastIterableBase, [A.CastIterable, A.__CastListBase__CastIterableBase_ListMixin]);
     _inherit(A._EfficientLengthCastIterable, A.CastIterable);
     _inherit(A._CastListBase, A.__CastListBase__CastIterableBase_ListMixin);
-    _inheritMany(A.Closure, [A.Closure2Args, A.Closure0Args, A.TearOffClosure, A.JsLinkedHashMap_values_closure, A.initHooks_closure, A.initHooks_closure1, A._AsyncRun__initializeScheduleImmediate_internalCallback, A._AsyncRun__initializeScheduleImmediate_closure, A.MapBase_entries_closure, A.splitBlockAs_closure, A.markApplies_closure, A.removeInlineAtoms_closure, A.toggleMark_closure, A.toggleMark__closure, A.chainCommands_closure, A.isAdjacentTo_closure, A.rangesFor_closure, A.history_closure1, A.buildCommand_closure, A.ContentMatch_fillBefore_search_closure, A.ContentMatch_toString_scan, A.ContentMatch_toString_closure, A.parseExprAtom_closure, A.nfa_edge, A.nfa_compile_closure, A.nullFrom_scan, A.dfa_explore, A.Fragment_textBetween_closure, A.Fragment_toStringInner_closure, A.Fragment_toJSON_closure, A.DOMParser_closure, A.DOMParser_schemaRules_insert, A._markMayApply_scan, A.PMNode_rangeHasMark_closure, A.PMNode_toJSON_closure, A.DOMSerializer_nodesFromSchema_closure, A._baseFields_closure0, A._baseFields_closure2, A._baseFields_closure4, A._baseFields_closure6, A.Configuration_Configuration_closure0, A.selectionToInsertionEnd_closure, A.addMark_closure, A.removeMark_closure, A.AddMarkStep_apply_closure, A.RemoveMarkStep_apply_closure, A._replaceNewlines_closure, A._replaceLinebreaks_closure, A.DecorationGroup_from_closure, A.viewDecorations_closure, A.EditorView_closure, A.buildNodeViews_closure, A.buildNodeViews_closure0, A.computeDocDeco_closure, A.ensureListeners_closure, A.runCustomHandler_closure, A.runCustomHandler_closure0, A.doPaste_closure, A.selectionBetween_closure, A.ViewMutationRecord_ViewMutationRecord$fromMutation_toList, A.NodeViewDesc_updateChildren_closure, A.NodeViewDesc_updateChildren_closure0, A.patchAttributes_closure, A.patchAttributes_closure0, A.iterDeco_closure, A.TiptapEditor__viewProps_closure0, A.TiptapEditor__viewProps_closure, A.BoldExtension_config_closure, A.ParagraphExtension_config_closure, A.main_closure1]);
-    _inheritMany(A.Closure2Args, [A._CastListBase_sort_closure, A.JsLinkedHashMap_addAll_closure, A.initHooks_closure0, A.LinkedHashMap_LinkedHashMap$from_closure, A.MapBase_mapToString_closure, A.history_closure0, A.history_closure, A.keydownHandler_closure, A.ContentMatch_fillBefore_search, A.nfa_connect, A.nfa_compile, A.Fragment_closure, A.Mark_setFrom_closure, A.NodeType_compile_closure, A.MarkType_compile_closure, A._baseFields_closure, A._baseFields_closure1, A._baseFields_closure3, A._baseFields_closure5, A.Configuration_Configuration_closure, A.DOMObserver_closure, A.editHandlers_closure, A.editHandlers_closure0, A.editHandlers_closure1, A.editHandlers_closure2, A.editHandlers_closure3, A.editHandlers_closure4, A.editHandlers_closure5, A.handlers_closure, A.handlers_closure0, A.handlers_closure1, A.handlers_closure2, A.handlers_closure3, A.handlers_closure4, A.handlers_closure5, A.handlers_closure6, A.handlers_closure7, A.handlers_closure8, A.handlers_closure9, A.handlers_closure10, A.TiptapEditor__nativeInlineShortcutPlugin_closure, A.BoldExtension_config_closure0, A.ItalicExtension_config_closure]);
+    _inheritMany(A.Closure, [A.Closure2Args, A.Closure0Args, A.TearOffClosure, A.JsLinkedHashMap_values_closure, A.initHooks_closure, A.initHooks_closure1, A._AsyncRun__initializeScheduleImmediate_internalCallback, A._AsyncRun__initializeScheduleImmediate_closure, A.MapBase_entries_closure, A.splitBlockAs_closure, A.markApplies_closure, A.removeInlineAtoms_closure, A.toggleMark_closure, A.toggleMark__closure, A.chainCommands_closure, A.dropCursor_closure, A.DropCursorView_closure, A.isAdjacentTo_closure, A.rangesFor_closure, A.history_closure1, A.buildCommand_closure, A.ContentMatch_fillBefore_search_closure, A.ContentMatch_toString_scan, A.ContentMatch_toString_closure, A.parseExprAtom_closure, A.nfa_edge, A.nfa_compile_closure, A.nullFrom_scan, A.dfa_explore, A.Fragment_textBetween_closure, A.Fragment_toStringInner_closure, A.Fragment_toJSON_closure, A.DOMParser_closure, A.DOMParser_schemaRules_insert, A._markMayApply_scan, A.PMNode_rangeHasMark_closure, A.PMNode_toJSON_closure, A.DOMSerializer_nodesFromSchema_closure, A._baseFields_closure0, A._baseFields_closure2, A._baseFields_closure4, A._baseFields_closure6, A.Configuration_Configuration_closure0, A.selectionToInsertionEnd_closure, A.addMark_closure, A.removeMark_closure, A.AddMarkStep_apply_closure, A.RemoveMarkStep_apply_closure, A._replaceNewlines_closure, A._replaceLinebreaks_closure, A.DecorationGroup_from_closure, A.viewDecorations_closure, A.EditorView_closure, A.buildNodeViews_closure, A.buildNodeViews_closure0, A.computeDocDeco_closure, A.ensureListeners_closure, A.runCustomHandler_closure, A.runCustomHandler_closure0, A.doPaste_closure, A.selectionBetween_closure, A.ViewMutationRecord_ViewMutationRecord$fromMutation_toList, A.NodeViewDesc_updateChildren_closure, A.NodeViewDesc_updateChildren_closure0, A.patchAttributes_closure, A.patchAttributes_closure0, A.iterDeco_closure, A.TiptapEditor__viewProps_closure0, A.TiptapEditor__viewProps_closure, A.BoldExtension_config_closure, A.ParagraphExtension_config_closure, A.main_closure1]);
+    _inheritMany(A.Closure2Args, [A._CastListBase_sort_closure, A.JsLinkedHashMap_addAll_closure, A.initHooks_closure0, A.LinkedHashMap_LinkedHashMap$from_closure, A.MapBase_mapToString_closure, A.DropCursorView_asPluginView_closure, A.history_closure0, A.history_closure, A.keydownHandler_closure, A.ContentMatch_fillBefore_search, A.nfa_connect, A.nfa_compile, A.Fragment_closure, A.Mark_setFrom_closure, A.NodeType_compile_closure, A.MarkType_compile_closure, A._baseFields_closure, A._baseFields_closure1, A._baseFields_closure3, A._baseFields_closure5, A.Configuration_Configuration_closure, A.DOMObserver_closure, A.editHandlers_closure, A.editHandlers_closure0, A.editHandlers_closure1, A.editHandlers_closure2, A.editHandlers_closure3, A.editHandlers_closure4, A.editHandlers_closure5, A.handlers_closure, A.handlers_closure0, A.handlers_closure1, A.handlers_closure2, A.handlers_closure3, A.handlers_closure4, A.handlers_closure5, A.handlers_closure6, A.handlers_closure7, A.handlers_closure8, A.handlers_closure9, A.handlers_closure10, A.TiptapEditor__nativeInlineShortcutPlugin_closure, A.BoldExtension_config_closure0, A.ItalicExtension_config_closure]);
     _inherit(A.CastList, A._CastListBase);
     _inheritMany(A.Error, [A.LateError, A.TypeError, A.JsNoSuchMethodError, A.UnknownJsTypeError, A._CyclicInitializationError, A.RuntimeError, A.AssertionError, A._Error, A.ArgumentError, A.UnsupportedError, A.UnimplementedError, A.StateError, A.ConcurrentModificationError, A.ReplaceError, A.TransformError]);
     _inheritMany(A.EfficientLengthIterable, [A.ListIterable, A.LinkedHashMapKeyIterable]);
@@ -19421,6 +20494,8 @@
     _inherit(A.EfficientLengthMappedIterable, A.MappedIterable);
     _inheritMany(A.MapBase, [A.UnmodifiableMapBase, A.JsLinkedHashMap]);
     _inherit(A.ListMapView, A.UnmodifiableMapBase);
+    _inherit(A._Record2, A._Record);
+    _inherit(A._Record_2_handler_name, A._Record2);
     _inheritMany(A.ConstantMap, [A.ConstantStringMap, A.GeneralConstantMap]);
     _inherit(A.NullError, A.TypeError);
     _inheritMany(A.TearOffClosure, [A.StaticClosure, A.BoundClosure]);
@@ -19435,8 +20510,10 @@
     _inheritMany(A.NativeTypedArrayOfDouble, [A.NativeFloat32List, A.NativeFloat64List]);
     _inheritMany(A.NativeTypedArrayOfInt, [A.NativeInt16List, A.NativeInt32List, A.NativeInt8List, A.NativeUint16List, A.NativeUint32List, A.NativeUint8ClampedList, A.NativeUint8List]);
     _inherit(A._TypeError, A._Error);
-    _inheritMany(A.Closure0Args, [A._AsyncRun__scheduleImmediateJsOverride_internalCallback, A._AsyncRun__scheduleImmediateWithSetImmediate_internalCallback, A._TimerImpl_internalCallback, A._rootHandleError_closure, A._RootZone_bindCallbackGuarded_closure, A.nfa_node, A.endOfTextblockVertical_closure, A.endOfTextblockHorizontal_closure, A.DOMObserver_suppressSelectionUpdates_closure, A.WidgetViewDesc_WidgetViewDesc_getPos, A.NodeViewDesc_create_getPos, A.main_closure, A.main_closure0]);
+    _inheritMany(A.Closure0Args, [A._AsyncRun__scheduleImmediateJsOverride_internalCallback, A._AsyncRun__scheduleImmediateWithSetImmediate_internalCallback, A._TimerImpl_internalCallback, A._rootHandleError_closure, A._RootZone_bindCallbackGuarded_closure, A.DropCursorView_scheduleRemoval_closure, A.nfa_node, A.endOfTextblockVertical_closure, A.endOfTextblockHorizontal_closure, A.DOMObserver_suppressSelectionUpdates_closure, A.WidgetViewDesc_WidgetViewDesc_getPos, A.NodeViewDesc_create_getPos, A.main_closure, A.main_closure0]);
     _inherit(A._RootZone, A._Zone);
+    _inherit(A._SetBase, A.SetBase);
+    _inherit(A._LinkedHashSet, A._SetBase);
     _inheritMany(A.ArgumentError, [A.RangeError, A.IndexError]);
     _inheritMany(A.Expr, [A.ChoiceExpr, A.SeqExpr, A.PlusExpr, A.StarExpr, A.OptExpr, A.RangeExpr, A.NameExpr]);
     _inheritMany(A.ParseRule, [A.TagParseRule, A.StyleParseRule]);
@@ -19448,7 +20525,7 @@
     _inheritMany(A.ViewDesc, [A.WidgetViewDesc, A.CompositionViewDesc, A.MarkViewDesc, A.NodeViewDesc, A.TrailingHackViewDesc]);
     _inherit(A.TextViewDesc, A.NodeViewDesc);
     _inherit(A.Extension, A.AnyExtension);
-    _inheritMany(A.Extension, [A.NodeExtension, A.MarkExtension]);
+    _inheritMany(A.Extension, [A.NodeExtension, A.MarkExtension, A.DropcursorExtension]);
     _inheritMany(A.MarkExtension, [A.BoldExtension, A.ItalicExtension]);
     _inheritMany(A.NodeExtension, [A.DocumentExtension, A.ParagraphExtension, A.TextExtension]);
     _mixin(A.__CastListBase__CastIterableBase_ListMixin, A.ListBase);
@@ -19462,13 +20539,16 @@
     typeUniverse: {eC: new Map(), tR: {}, eT: {}, tPV: {}, sEA: []},
     mangledGlobalNames: {int: "int", double: "double", num: "num", String: "String", bool: "bool", Null: "Null", List: "List", Object: "Object", Map: "Map"},
     mangledNames: {},
-    types: ["bool(EditorView,JSObject)", "bool(EditorState[~(Transaction)?,@])", "~()", "@(@)", "bool(PMNode,int,PMNode?,int)", "Null(@)", "~(~())", "~(int,int,int,int)", "Null()", "bool(EditorView,@)", "PMNode(PMNode,PMNode,int)", "~(PMNode,int,int)", "bool()", "~(Transaction)", "int?()", "bool(String)", "bool(Decoration)", "List<Object>(Mark,bool)", "String()", "int(@,@)", "List<_Edge>(Expr,int)", "NameExpr(NodeType)", "int()", "_Edge(int[int?,NodeType?])", "~(List<_Edge>,int)", "~(Object?,Object?)", "List<_Edge>(Expr)", "~(int)", "ContentMatch(List<int>)", "int(int,PMNode)", "Null(PMNode,int,PMNode?,int)", "String(PMNode)", "@(PMNode)", "bool(TagParseRule)", "~(ParseRule)", "bool(ContentMatch)", "int(Mark,Mark)", "@(Mark)", "~(String,NodeSpec)", "~(String,MarkSpec)", "String?(PMNode)", "PMNode(EditorStateConfig,EditorState)", "PMNode(Transaction,PMNode,EditorState,EditorState)", "Selection(EditorStateConfig,EditorState)", "Selection(Transaction,Selection,EditorState,EditorState)", "List<Mark>?(EditorStateConfig,EditorState)", "List<Mark>?(Transaction,List<Mark>?,EditorState,EditorState)", "int(EditorStateConfig,EditorState)", "int(Transaction,int,EditorState,EditorState)", "int(Decoration,Decoration)", "@(Transaction,@,EditorState,EditorState)", "Null(~())", "@(String)", "bool(DecorationSource)", "bool(SelectionRange)", "Null(JSArray<Object?>,JSObject)", "@(@,String)", "~(int,int,bool,List<JSObject>)", "HistoryState(@,@)", "Null(JSObject)", "List<JSObject>(JSObject)", "HistoryState(@,@,@,@)", "~(Decoration,int,bool)", "~(PMNode,List<Decoration>,DecorationSource,int)", "bool(@,@)", "~(@,@)", "bool(EditorState)", "Object(String)", "Fragment?(ContentMatch,List<NodeType>)", "List<Object>(PMNode)", "PMNode(NodeType)", "~(bool)", "~(ContentMatch)", "String(MapEntry<int,ContentMatch>)", "int(int,int)", "@(EditorStateConfig,EditorState)"],
+    types: ["bool(EditorView,JSObject)", "bool(EditorState[~(Transaction)?,@])", "~()", "@(@)", "bool(PMNode,int,PMNode?,int)", "Null(@)", "~(~())", "~(int,int,int,int)", "Null()", "bool(EditorView,@)", "PMNode(PMNode,PMNode,int)", "~(PMNode,int,int)", "bool()", "~(Transaction)", "int?()", "bool(String)", "bool(Decoration)", "List<Object>(Mark,bool)", "String()", "int(@,@)", "_Edge(int[int?,NodeType?])", "PMNode(NodeType)", "~(ContentMatch)", "String(MapEntry<int,ContentMatch>)", "NameExpr(NodeType)", "int()", "~(Object?,Object?)", "~(List<_Edge>,int)", "List<_Edge>(Expr,int)", "List<_Edge>(Expr)", "~(int)", "ContentMatch(List<int>)", "int(int,PMNode)", "Null(PMNode,int,PMNode?,int)", "String(PMNode)", "@(PMNode)", "bool(TagParseRule)", "~(ParseRule)", "bool(ContentMatch)", "int(Mark,Mark)", "@(Mark)", "~(String,NodeSpec)", "~(String,MarkSpec)", "String?(PMNode)", "PMNode(EditorStateConfig,EditorState)", "PMNode(Transaction,PMNode,EditorState,EditorState)", "Selection(EditorStateConfig,EditorState)", "Selection(Transaction,Selection,EditorState,EditorState)", "List<Mark>?(EditorStateConfig,EditorState)", "List<Mark>?(Transaction,List<Mark>?,EditorState,EditorState)", "int(EditorStateConfig,EditorState)", "int(Transaction,int,EditorState,EditorState)", "int(Decoration,Decoration)", "@(Transaction,@,EditorState,EditorState)", "Null(~())", "@(String)", "bool(DecorationSource)", "bool(SelectionRange)", "Null(JSArray<Object?>,JSObject)", "PluginView(@)", "~(int,int,bool,List<JSObject>)", "~(JSObject)", "Null(JSObject)", "List<JSObject>(JSObject)", "~(@,EditorState)", "~(Decoration,int,bool)", "~(PMNode,List<Decoration>,DecorationSource,int)", "@(@,String)", "HistoryState(@,@)", "bool(EditorState)", "Object(String)", "HistoryState(@,@,@,@)", "List<Object>(PMNode)", "bool(@,@)", "~(bool)", "~(@,@)", "Fragment?(ContentMatch,List<NodeType>)", "int(int,int)", "@(EditorStateConfig,EditorState)"],
     interceptorsByTag: null,
     leafTags: null,
-    arrayRti: Symbol("$ti")
+    arrayRti: Symbol("$ti"),
+    rttc: {
+      "2;handler,name": (t1, t2) => o => o instanceof A._Record_2_handler_name && t1._is(o._0) && t2._is(o._1)
+    }
   };
-  A._Universe_addRules(init.typeUniverse, JSON.parse('{"JavaScriptFunction":"LegacyJavaScriptObject","PlainJavaScriptObject":"LegacyJavaScriptObject","UnknownJavaScriptObject":"LegacyJavaScriptObject","JSArray":{"List":["1"],"EfficientLengthIterable":["1"],"JSObject":[],"Iterable":["1"]},"JSBool":{"bool":[],"TrustedGetRuntimeType":[]},"JSNull":{"TrustedGetRuntimeType":[]},"JavaScriptObject":{"JSObject":[]},"LegacyJavaScriptObject":{"JSObject":[]},"JSUnmodifiableArray":{"JSArray":["1"],"List":["1"],"EfficientLengthIterable":["1"],"JSObject":[],"Iterable":["1"]},"ArrayIterator":{"Iterator":["1"]},"JSNumber":{"double":[],"num":[],"Comparable":["num"]},"JSInt":{"double":[],"int":[],"num":[],"Comparable":["num"],"TrustedGetRuntimeType":[]},"JSNumNotInt":{"double":[],"num":[],"Comparable":["num"],"TrustedGetRuntimeType":[]},"JSString":{"String":[],"Comparable":["String"],"Pattern":[],"TrustedGetRuntimeType":[]},"_CastIterableBase":{"Iterable":["2"]},"CastIterator":{"Iterator":["2"]},"CastIterable":{"_CastIterableBase":["1","2"],"Iterable":["2"],"Iterable.E":"2"},"_EfficientLengthCastIterable":{"CastIterable":["1","2"],"_CastIterableBase":["1","2"],"EfficientLengthIterable":["2"],"Iterable":["2"],"Iterable.E":"2"},"_CastListBase":{"ListBase":["2"],"List":["2"],"_CastIterableBase":["1","2"],"EfficientLengthIterable":["2"],"Iterable":["2"]},"CastList":{"_CastListBase":["1","2"],"ListBase":["2"],"List":["2"],"_CastIterableBase":["1","2"],"EfficientLengthIterable":["2"],"Iterable":["2"],"ListBase.E":"2","Iterable.E":"2"},"LateError":{"Error":[]},"EfficientLengthIterable":{"Iterable":["1"]},"ListIterable":{"EfficientLengthIterable":["1"],"Iterable":["1"]},"SubListIterable":{"ListIterable":["1"],"EfficientLengthIterable":["1"],"Iterable":["1"],"ListIterable.E":"1","Iterable.E":"1"},"ListIterator":{"Iterator":["1"]},"MappedIterable":{"Iterable":["2"],"Iterable.E":"2"},"EfficientLengthMappedIterable":{"MappedIterable":["1","2"],"EfficientLengthIterable":["2"],"Iterable":["2"],"Iterable.E":"2"},"MappedIterator":{"Iterator":["2"]},"MappedListIterable":{"ListIterable":["2"],"EfficientLengthIterable":["2"],"Iterable":["2"],"ListIterable.E":"2","Iterable.E":"2"},"WhereIterable":{"Iterable":["1"],"Iterable.E":"1"},"WhereIterator":{"Iterator":["1"]},"ExpandIterable":{"Iterable":["2"],"Iterable.E":"2"},"ExpandIterator":{"Iterator":["2"]},"EmptyIterator":{"Iterator":["1"]},"_ListIndicesIterable":{"ListIterable":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"],"ListIterable.E":"int","Iterable.E":"int"},"ListMapView":{"MapBase":["int","1"],"_UnmodifiableMapMixin":["int","1"],"Map":["int","1"],"MapBase.K":"int","MapBase.V":"1"},"ReversedListIterable":{"ListIterable":["1"],"EfficientLengthIterable":["1"],"Iterable":["1"],"ListIterable.E":"1","Iterable.E":"1"},"ConstantMap":{"Map":["1","2"]},"ConstantStringMap":{"ConstantMap":["1","2"],"Map":["1","2"]},"_KeysOrValues":{"Iterable":["1"],"Iterable.E":"1"},"_KeysOrValuesOrElementsIterator":{"Iterator":["1"]},"GeneralConstantMap":{"ConstantMap":["1","2"],"Map":["1","2"]},"NullError":{"Error":[]},"JsNoSuchMethodError":{"Error":[]},"UnknownJsTypeError":{"Error":[]},"_StackTrace":{"StackTrace":[]},"Closure":{"Function":[]},"Closure0Args":{"Function":[]},"Closure2Args":{"Function":[]},"TearOffClosure":{"Function":[]},"StaticClosure":{"Function":[]},"BoundClosure":{"Function":[]},"_CyclicInitializationError":{"Error":[]},"RuntimeError":{"Error":[]},"_AssertionError":{"Error":[]},"JsLinkedHashMap":{"MapBase":["1","2"],"LinkedHashMap":["1","2"],"Map":["1","2"],"MapBase.K":"1","MapBase.V":"2"},"LinkedHashMapKeyIterable":{"EfficientLengthIterable":["1"],"Iterable":["1"],"Iterable.E":"1"},"LinkedHashMapKeyIterator":{"Iterator":["1"]},"JsConstantLinkedHashMap":{"JsLinkedHashMap":["1","2"],"MapBase":["1","2"],"LinkedHashMap":["1","2"],"Map":["1","2"],"MapBase.K":"1","MapBase.V":"2"},"JSSyntaxRegExp":{"RegExp":[],"Pattern":[]},"_MatchImplementation":{"RegExpMatch":[],"Match":[]},"_AllMatchesIterable":{"Iterable":["RegExpMatch"],"Iterable.E":"RegExpMatch"},"_AllMatchesIterator":{"Iterator":["RegExpMatch"]},"StringMatch":{"Match":[]},"_StringAllMatchesIterable":{"Iterable":["Match"],"Iterable.E":"Match"},"_StringAllMatchesIterator":{"Iterator":["Match"]},"NativeByteBuffer":{"JSObject":[],"TrustedGetRuntimeType":[]},"NativeTypedData":{"JSObject":[]},"NativeByteData":{"JSObject":[],"TrustedGetRuntimeType":[]},"NativeTypedArray":{"JavaScriptIndexingBehavior":["1"],"JSObject":[]},"NativeTypedArrayOfDouble":{"ListBase":["double"],"List":["double"],"JavaScriptIndexingBehavior":["double"],"EfficientLengthIterable":["double"],"JSObject":[],"Iterable":["double"],"FixedLengthListMixin":["double"]},"NativeTypedArrayOfInt":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"]},"NativeFloat32List":{"ListBase":["double"],"List":["double"],"JavaScriptIndexingBehavior":["double"],"EfficientLengthIterable":["double"],"JSObject":[],"Iterable":["double"],"FixedLengthListMixin":["double"],"TrustedGetRuntimeType":[],"ListBase.E":"double","FixedLengthListMixin.E":"double"},"NativeFloat64List":{"ListBase":["double"],"List":["double"],"JavaScriptIndexingBehavior":["double"],"EfficientLengthIterable":["double"],"JSObject":[],"Iterable":["double"],"FixedLengthListMixin":["double"],"TrustedGetRuntimeType":[],"ListBase.E":"double","FixedLengthListMixin.E":"double"},"NativeInt16List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeInt32List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeInt8List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeUint16List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeUint32List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeUint8ClampedList":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeUint8List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"_Error":{"Error":[]},"_TypeError":{"Error":[]},"_TimerImpl":{"Timer":[]},"_SyncStarIterator":{"Iterator":["1"]},"_SyncStarIterable":{"Iterable":["1"],"Iterable.E":"1"},"_Zone":{"Zone":[]},"_RootZone":{"Zone":[]},"MapBase":{"Map":["1","2"]},"UnmodifiableMapBase":{"MapBase":["1","2"],"_UnmodifiableMapMixin":["1","2"],"Map":["1","2"]},"double":{"num":[],"Comparable":["num"]},"Duration":{"Comparable":["Duration"]},"int":{"num":[],"Comparable":["num"]},"List":{"EfficientLengthIterable":["1"],"Iterable":["1"]},"num":{"Comparable":["num"]},"RegExpMatch":{"Match":[]},"String":{"Comparable":["String"],"Pattern":[]},"AssertionError":{"Error":[]},"TypeError":{"Error":[]},"ArgumentError":{"Error":[]},"RangeError":{"Error":[]},"IndexError":{"Error":[]},"UnsupportedError":{"Error":[]},"UnimplementedError":{"Error":[]},"StateError":{"Error":[]},"ConcurrentModificationError":{"Error":[]},"OutOfMemoryError":{"Error":[]},"StackOverflowError":{"Error":[]},"NameExpr":{"Expr":[]},"ChoiceExpr":{"Expr":[]},"SeqExpr":{"Expr":[]},"PlusExpr":{"Expr":[]},"StarExpr":{"Expr":[]},"OptExpr":{"Expr":[]},"RangeExpr":{"Expr":[]},"TagParseRule":{"ParseRule":[]},"StyleParseRule":{"ParseRule":[]},"TextNode":{"PMNode":[]},"ReplaceError":{"Error":[]},"TextSelection":{"Selection":[]},"NodeSelection":{"Selection":[]},"AllSelection":{"Selection":[]},"TextBookmark":{"SelectionBookmark":[]},"NodeBookmark":{"SelectionBookmark":[]},"Transaction":{"Transform":[]},"StepMap":{"Mappable":[]},"Mapping":{"Mappable":[]},"AddMarkStep":{"Step":[]},"RemoveMarkStep":{"Step":[]},"ReplaceStep":{"Step":[]},"ReplaceAroundStep":{"Step":[]},"TransformError":{"Error":[]},"DecorationSet":{"DecorationSource":[]},"NodeTypeDecoration":{"DecorationType":[]},"DecorationGroup":{"DecorationSource":[]},"DirectEditorProps":{"EditorProps":[]},"_RenderedMarkView":{"MarkView":[]},"WidgetViewDesc":{"ViewDesc":[]},"CompositionViewDesc":{"ViewDesc":[]},"MarkViewDesc":{"ViewDesc":[]},"NodeViewDesc":{"ViewDesc":[]},"TextViewDesc":{"NodeViewDesc":[],"ViewDesc":[]},"TrailingHackViewDesc":{"ViewDesc":[]},"Extension":{"AnyExtension":[]},"NodeExtension":{"AnyExtension":[]},"MarkExtension":{"AnyExtension":[]},"BoldExtension":{"AnyExtension":[]},"DocumentExtension":{"AnyExtension":[]},"ItalicExtension":{"AnyExtension":[]},"ParagraphExtension":{"AnyExtension":[]},"TextExtension":{"AnyExtension":[]},"Int8List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Uint8List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Uint8ClampedList":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Int16List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Uint16List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Int32List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Uint32List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Float32List":{"List":["double"],"EfficientLengthIterable":["double"],"Iterable":["double"]},"Float64List":{"List":["double"],"EfficientLengthIterable":["double"],"Iterable":["double"]}}'));
-  A._Universe_addErasedTypes(init.typeUniverse, JSON.parse('{"__CastListBase__CastIterableBase_ListMixin":2,"NativeTypedArray":1,"UnmodifiableMapBase":2}'));
+  A._Universe_addRules(init.typeUniverse, JSON.parse('{"JavaScriptFunction":"LegacyJavaScriptObject","PlainJavaScriptObject":"LegacyJavaScriptObject","UnknownJavaScriptObject":"LegacyJavaScriptObject","JSArray":{"List":["1"],"EfficientLengthIterable":["1"],"JSObject":[],"Iterable":["1"]},"JSBool":{"bool":[],"TrustedGetRuntimeType":[]},"JSNull":{"TrustedGetRuntimeType":[]},"JavaScriptObject":{"JSObject":[]},"LegacyJavaScriptObject":{"JSObject":[]},"JSUnmodifiableArray":{"JSArray":["1"],"List":["1"],"EfficientLengthIterable":["1"],"JSObject":[],"Iterable":["1"]},"ArrayIterator":{"Iterator":["1"]},"JSNumber":{"double":[],"num":[],"Comparable":["num"]},"JSInt":{"double":[],"int":[],"num":[],"Comparable":["num"],"TrustedGetRuntimeType":[]},"JSNumNotInt":{"double":[],"num":[],"Comparable":["num"],"TrustedGetRuntimeType":[]},"JSString":{"String":[],"Comparable":["String"],"Pattern":[],"TrustedGetRuntimeType":[]},"_CastIterableBase":{"Iterable":["2"]},"CastIterator":{"Iterator":["2"]},"CastIterable":{"_CastIterableBase":["1","2"],"Iterable":["2"],"Iterable.E":"2"},"_EfficientLengthCastIterable":{"CastIterable":["1","2"],"_CastIterableBase":["1","2"],"EfficientLengthIterable":["2"],"Iterable":["2"],"Iterable.E":"2"},"_CastListBase":{"ListBase":["2"],"List":["2"],"_CastIterableBase":["1","2"],"EfficientLengthIterable":["2"],"Iterable":["2"]},"CastList":{"_CastListBase":["1","2"],"ListBase":["2"],"List":["2"],"_CastIterableBase":["1","2"],"EfficientLengthIterable":["2"],"Iterable":["2"],"ListBase.E":"2","Iterable.E":"2"},"LateError":{"Error":[]},"EfficientLengthIterable":{"Iterable":["1"]},"ListIterable":{"EfficientLengthIterable":["1"],"Iterable":["1"]},"SubListIterable":{"ListIterable":["1"],"EfficientLengthIterable":["1"],"Iterable":["1"],"ListIterable.E":"1","Iterable.E":"1"},"ListIterator":{"Iterator":["1"]},"MappedIterable":{"Iterable":["2"],"Iterable.E":"2"},"EfficientLengthMappedIterable":{"MappedIterable":["1","2"],"EfficientLengthIterable":["2"],"Iterable":["2"],"Iterable.E":"2"},"MappedIterator":{"Iterator":["2"]},"MappedListIterable":{"ListIterable":["2"],"EfficientLengthIterable":["2"],"Iterable":["2"],"ListIterable.E":"2","Iterable.E":"2"},"WhereIterable":{"Iterable":["1"],"Iterable.E":"1"},"WhereIterator":{"Iterator":["1"]},"ExpandIterable":{"Iterable":["2"],"Iterable.E":"2"},"ExpandIterator":{"Iterator":["2"]},"EmptyIterator":{"Iterator":["1"]},"_ListIndicesIterable":{"ListIterable":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"],"ListIterable.E":"int","Iterable.E":"int"},"ListMapView":{"MapBase":["int","1"],"_UnmodifiableMapMixin":["int","1"],"Map":["int","1"],"MapBase.K":"int","MapBase.V":"1"},"ReversedListIterable":{"ListIterable":["1"],"EfficientLengthIterable":["1"],"Iterable":["1"],"ListIterable.E":"1","Iterable.E":"1"},"_Record_2_handler_name":{"_Record2":[],"_Record":[]},"ConstantMap":{"Map":["1","2"]},"ConstantStringMap":{"ConstantMap":["1","2"],"Map":["1","2"]},"_KeysOrValues":{"Iterable":["1"],"Iterable.E":"1"},"_KeysOrValuesOrElementsIterator":{"Iterator":["1"]},"GeneralConstantMap":{"ConstantMap":["1","2"],"Map":["1","2"]},"NullError":{"Error":[]},"JsNoSuchMethodError":{"Error":[]},"UnknownJsTypeError":{"Error":[]},"_StackTrace":{"StackTrace":[]},"Closure":{"Function":[]},"Closure0Args":{"Function":[]},"Closure2Args":{"Function":[]},"TearOffClosure":{"Function":[]},"StaticClosure":{"Function":[]},"BoundClosure":{"Function":[]},"_CyclicInitializationError":{"Error":[]},"RuntimeError":{"Error":[]},"_AssertionError":{"Error":[]},"JsLinkedHashMap":{"MapBase":["1","2"],"LinkedHashMap":["1","2"],"Map":["1","2"],"MapBase.K":"1","MapBase.V":"2"},"LinkedHashMapKeyIterable":{"EfficientLengthIterable":["1"],"Iterable":["1"],"Iterable.E":"1"},"LinkedHashMapKeyIterator":{"Iterator":["1"]},"JsConstantLinkedHashMap":{"JsLinkedHashMap":["1","2"],"MapBase":["1","2"],"LinkedHashMap":["1","2"],"Map":["1","2"],"MapBase.K":"1","MapBase.V":"2"},"_Record2":{"_Record":[]},"JSSyntaxRegExp":{"RegExp":[],"Pattern":[]},"_MatchImplementation":{"RegExpMatch":[],"Match":[]},"_AllMatchesIterable":{"Iterable":["RegExpMatch"],"Iterable.E":"RegExpMatch"},"_AllMatchesIterator":{"Iterator":["RegExpMatch"]},"StringMatch":{"Match":[]},"_StringAllMatchesIterable":{"Iterable":["Match"],"Iterable.E":"Match"},"_StringAllMatchesIterator":{"Iterator":["Match"]},"NativeByteBuffer":{"JSObject":[],"TrustedGetRuntimeType":[]},"NativeTypedData":{"JSObject":[]},"NativeByteData":{"JSObject":[],"TrustedGetRuntimeType":[]},"NativeTypedArray":{"JavaScriptIndexingBehavior":["1"],"JSObject":[]},"NativeTypedArrayOfDouble":{"ListBase":["double"],"List":["double"],"JavaScriptIndexingBehavior":["double"],"EfficientLengthIterable":["double"],"JSObject":[],"Iterable":["double"],"FixedLengthListMixin":["double"]},"NativeTypedArrayOfInt":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"]},"NativeFloat32List":{"ListBase":["double"],"List":["double"],"JavaScriptIndexingBehavior":["double"],"EfficientLengthIterable":["double"],"JSObject":[],"Iterable":["double"],"FixedLengthListMixin":["double"],"TrustedGetRuntimeType":[],"ListBase.E":"double","FixedLengthListMixin.E":"double"},"NativeFloat64List":{"ListBase":["double"],"List":["double"],"JavaScriptIndexingBehavior":["double"],"EfficientLengthIterable":["double"],"JSObject":[],"Iterable":["double"],"FixedLengthListMixin":["double"],"TrustedGetRuntimeType":[],"ListBase.E":"double","FixedLengthListMixin.E":"double"},"NativeInt16List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeInt32List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeInt8List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeUint16List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeUint32List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeUint8ClampedList":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"NativeUint8List":{"ListBase":["int"],"List":["int"],"JavaScriptIndexingBehavior":["int"],"EfficientLengthIterable":["int"],"JSObject":[],"Iterable":["int"],"FixedLengthListMixin":["int"],"TrustedGetRuntimeType":[],"ListBase.E":"int","FixedLengthListMixin.E":"int"},"_Error":{"Error":[]},"_TypeError":{"Error":[]},"_TimerImpl":{"Timer":[]},"_SyncStarIterator":{"Iterator":["1"]},"_SyncStarIterable":{"Iterable":["1"],"Iterable.E":"1"},"_Zone":{"Zone":[]},"_RootZone":{"Zone":[]},"_LinkedHashSet":{"SetBase":["1"],"EfficientLengthIterable":["1"],"Iterable":["1"]},"_LinkedHashSetIterator":{"Iterator":["1"]},"MapBase":{"Map":["1","2"]},"UnmodifiableMapBase":{"MapBase":["1","2"],"_UnmodifiableMapMixin":["1","2"],"Map":["1","2"]},"SetBase":{"EfficientLengthIterable":["1"],"Iterable":["1"]},"_SetBase":{"SetBase":["1"],"EfficientLengthIterable":["1"],"Iterable":["1"]},"double":{"num":[],"Comparable":["num"]},"Duration":{"Comparable":["Duration"]},"int":{"num":[],"Comparable":["num"]},"List":{"EfficientLengthIterable":["1"],"Iterable":["1"]},"num":{"Comparable":["num"]},"RegExpMatch":{"Match":[]},"String":{"Comparable":["String"],"Pattern":[]},"AssertionError":{"Error":[]},"TypeError":{"Error":[]},"ArgumentError":{"Error":[]},"RangeError":{"Error":[]},"IndexError":{"Error":[]},"UnsupportedError":{"Error":[]},"UnimplementedError":{"Error":[]},"StateError":{"Error":[]},"ConcurrentModificationError":{"Error":[]},"OutOfMemoryError":{"Error":[]},"StackOverflowError":{"Error":[]},"NameExpr":{"Expr":[]},"ChoiceExpr":{"Expr":[]},"SeqExpr":{"Expr":[]},"PlusExpr":{"Expr":[]},"StarExpr":{"Expr":[]},"OptExpr":{"Expr":[]},"RangeExpr":{"Expr":[]},"TagParseRule":{"ParseRule":[]},"StyleParseRule":{"ParseRule":[]},"TextNode":{"PMNode":[]},"ReplaceError":{"Error":[]},"TextSelection":{"Selection":[]},"NodeSelection":{"Selection":[]},"AllSelection":{"Selection":[]},"TextBookmark":{"SelectionBookmark":[]},"NodeBookmark":{"SelectionBookmark":[]},"Transaction":{"Transform":[]},"StepMap":{"Mappable":[]},"Mapping":{"Mappable":[]},"AddMarkStep":{"Step":[]},"RemoveMarkStep":{"Step":[]},"ReplaceStep":{"Step":[]},"ReplaceAroundStep":{"Step":[]},"TransformError":{"Error":[]},"DecorationSet":{"DecorationSource":[]},"NodeTypeDecoration":{"DecorationType":[]},"DecorationGroup":{"DecorationSource":[]},"DirectEditorProps":{"EditorProps":[]},"_RenderedMarkView":{"MarkView":[]},"WidgetViewDesc":{"ViewDesc":[]},"CompositionViewDesc":{"ViewDesc":[]},"MarkViewDesc":{"ViewDesc":[]},"NodeViewDesc":{"ViewDesc":[]},"TextViewDesc":{"NodeViewDesc":[],"ViewDesc":[]},"TrailingHackViewDesc":{"ViewDesc":[]},"Extension":{"AnyExtension":[]},"NodeExtension":{"AnyExtension":[]},"MarkExtension":{"AnyExtension":[]},"BoldExtension":{"AnyExtension":[]},"DocumentExtension":{"AnyExtension":[]},"DropcursorExtension":{"AnyExtension":[]},"ItalicExtension":{"AnyExtension":[]},"ParagraphExtension":{"AnyExtension":[]},"TextExtension":{"AnyExtension":[]},"Int8List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Uint8List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Uint8ClampedList":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Int16List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Uint16List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Int32List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Uint32List":{"List":["int"],"EfficientLengthIterable":["int"],"Iterable":["int"]},"Float32List":{"List":["double"],"EfficientLengthIterable":["double"],"Iterable":["double"]},"Float64List":{"List":["double"],"EfficientLengthIterable":["double"],"Iterable":["double"]}}'));
+  A._Universe_addErasedTypes(init.typeUniverse, JSON.parse('{"__CastListBase__CastIterableBase_ListMixin":2,"NativeTypedArray":1,"UnmodifiableMapBase":2,"_SetBase":1}'));
   var string$ = {
     Called: "Called contentMatchAt on a node with invalid content",
     NodeTy: "NodeType.create can't construct text nodes"
@@ -19517,7 +20597,9 @@
       JSArray_OuterDecoLevel: findType("JSArray<OuterDecoLevel>"),
       JSArray_PMNode: findType("JSArray<PMNode>"),
       JSArray_ParseRule: findType("JSArray<ParseRule>"),
+      JSArray_PluginView: findType("JSArray<PluginView>"),
       JSArray_Plugin_dynamic: findType("JSArray<Plugin<@>>"),
+      JSArray_Record_2_JavaScriptFunction_handler_and_String_name: findType("JSArray<+handler,name(JavaScriptFunction,String)>"),
       JSArray_ResolvedPos: findType("JSArray<ResolvedPos>"),
       JSArray_SelectionRange: findType("JSArray<SelectionRange>"),
       JSArray_Step: findType("JSArray<Step>"),
@@ -19547,6 +20629,7 @@
       List_NodeContext: findType("List<NodeContext>"),
       List_NodeType: findType("List<NodeType>"),
       List_PMNode: findType("List<PMNode>"),
+      List_PluginView: findType("List<PluginView>"),
       List_Plugin_dynamic: findType("List<Plugin<@>>"),
       List_StepMap: findType("List<StepMap>"),
       List_String: findType("List<String>"),
@@ -19569,8 +20652,10 @@
       Null: findType("Null"),
       Object: findType("Object"),
       PMNode: findType("PMNode"),
+      PluginSpec_dynamic: findType("PluginSpec<@>"),
       Plugin_dynamic: findType("Plugin<@>"),
       Record: findType("Record"),
+      Record_0: findType("+()"),
       RegExpMatch: findType("RegExpMatch"),
       ReversedListIterable_Item: findType("ReversedListIterable<Item>"),
       ReversedListIterable_NodeType: findType("ReversedListIterable<NodeType>"),
@@ -19620,6 +20705,7 @@
       nullable_NodeView: findType("NodeView?"),
       nullable_Object: findType("Object?"),
       nullable_Transaction: findType("Transaction?"),
+      nullable__LinkedHashSetCell: findType("_LinkedHashSetCell?"),
       nullable_bool_Function_4_PMNode_and_int_and_nullable_PMNode_and_int: findType("bool?(PMNode,int,PMNode?,int)"),
       nullable_dynamic_Function_dynamic: findType("@(@)?"),
       nullable_void_Function_Transaction: findType("~(Transaction)?"),
@@ -19642,6 +20728,7 @@
     B.JavaScriptObject_methods = J.JavaScriptObject.prototype;
     B.PlainJavaScriptObject_methods = J.PlainJavaScriptObject.prototype;
     B.UnknownJavaScriptObject_methods = J.UnknownJavaScriptObject.prototype;
+    B.C_DropCursorOptions = new A.DropCursorOptions();
     B.C_EmptyIterator = new A.EmptyIterator(A.findType("EmptyIterator<0&>"));
     B.C_HistoryOptions = new A.HistoryOptions();
     B.C_JS_CONST = function getTagFallback(o) {
@@ -19770,6 +20857,7 @@
     B.C_JS_CONST3 = function(hooks) { return hooks; }
 ;
     B.C_OutOfMemoryError = new A.OutOfMemoryError();
+    B.C_SentinelValue = new A.SentinelValue();
     B.C__RootZone = new A._RootZone();
     B.Duration_0 = new A.Duration(0);
     B.DocumentExtension_doc = new A.DocumentExtension("doc");
@@ -19777,7 +20865,9 @@
     B.TextExtension_text = new A.TextExtension("text");
     B.BoldExtension_bold = new A.BoldExtension("bold");
     B.ItalicExtension_italic = new A.ItalicExtension("italic");
-    B.List_1Kb = A._setArrayType(makeConstList([B.DocumentExtension_doc, B.ParagraphExtension_paragraph, B.TextExtension_text, B.BoldExtension_bold, B.ItalicExtension_italic]), A.findType("JSArray<AnyExtension>"));
+    B.DropcursorExtension_dropcursor = new A.DropcursorExtension("dropcursor");
+    B.List_SV3 = A._setArrayType(makeConstList([B.DocumentExtension_doc, B.ParagraphExtension_paragraph, B.TextExtension_text, B.BoldExtension_bold, B.ItalicExtension_italic, B.DropcursorExtension_dropcursor]), A.findType("JSArray<AnyExtension>"));
+    B.List_dragover_dragend_drop_dragleave = A._setArrayType(makeConstList(["dragover", "dragend", "drop", "dragleave"]), type$.JSArray_String);
     B.List_empty2 = A._setArrayType(makeConstList([]), type$.JSArray_Decoration);
     B.List_empty5 = A._setArrayType(makeConstList([]), type$.JSArray_Item);
     B.List_empty4 = A._setArrayType(makeConstList([]), type$.JSArray_JSObject);
@@ -19802,6 +20892,7 @@
     B.Type_Int16List_cot = A.typeLiteral("Int16List");
     B.Type_Int32List_m1p = A.typeLiteral("Int32List");
     B.Type_Int8List_woc = A.typeLiteral("Int8List");
+    B.Type_Object_QJv = A.typeLiteral("Object");
     B.Type_Uint16List_2mh = A.typeLiteral("Uint16List");
     B.Type_Uint32List_2mh = A.typeLiteral("Uint32List");
     B.Type_Uint8ClampedList_9Bb = A.typeLiteral("Uint8ClampedList");
@@ -19819,6 +20910,7 @@
     $.dispatchRecordsForInstanceTags = null;
     $.interceptorsForUncacheableTags = null;
     $.initNativeDispatchFlag = null;
+    $._Record__computedFieldKeys = A._setArrayType([], A.findType("JSArray<List<Object>?>"));
     $._nextCallback = null;
     $._lastCallback = null;
     $._lastPriorityCallback = null;
@@ -19880,6 +20972,7 @@
       }
     }()));
     _lazyFinal($, "_AsyncRun__scheduleImmediateClosure", "$get$_AsyncRun__scheduleImmediateClosure", () => A._AsyncRun__initializeScheduleImmediate());
+    _lazyFinal($, "_hashSeed", "$get$_hashSeed", () => A.objectHashCode(B.Type_Object_QJv));
     _lazyFinal($, "_jsBoxedDartObjectProperty", "$get$_jsBoxedDartObjectProperty", () => Symbol("jsBoxedDartObjectProperty"));
     _lazyFinal($, "splitBlock", "$get$splitBlock", () => A.splitBlockAs());
     _lazyFinal($, "backspaceCommand", "$get$backspaceCommand", () => A.chainCommands(A._setArrayType([A.commands__deleteSelection$closure(), A.commands__joinBackward$closure(), A.commands__selectNodeBackward$closure()], A.findType("JSArray<bool(EditorState[~(Transaction)?,@])>"))));

@@ -68,11 +68,11 @@ A view deixou de ser scaffold e agora é uma implementação funcional inicial. 
 - [x] `clipboard.dart`: copy/cut serializa via `DOMSerializer`; paste via `parseSlice`.
 - [x] Seleção: sincronização bidirecional `Selection` DOM ↔ `TextSelection`/`NodeSelection`.
 - [x] `decoration.dart`: `Decoration.widget/inline/node` + `DecorationSet` (necessário para cursor de drop, realce de busca e paginação por decorações).
-- [ ] Portar `prosemirror-dropcursor` (referência já clonada).
+- [x] Portar `prosemirror-dropcursor` (plugin visual via `PluginSpec.view`, `DropCursorView` e extensão Tiptap `DropcursorExtension`).
 - [ ] Endurecer `domchange.dart` para paridade completa com `prosemirror-view/src/domchange.ts`, incluindo casos de composição, joins/backspace e restauração precisa de seleção.
 - [ ] Adicionar teste de `MutationObserver` provando re-render localizado por parágrafo.
 
-**Aceite parcial já validado:** a demo `web/tiptap_demo.html` compila para JS e foi verificada em Chrome headless: digitação, `Ctrl+B`, `Ctrl+Z`/`Ctrl+Y`, `getTiptapHTML()` e `setEditable(false)` funcionam sem erros de console. **Aceite final pendente:** digitar no meio de um documento de 200 páginas altera apenas o subtree DOM do parágrafo editado (verificável com `MutationObserver` no teste), latência < 16 ms.
+**Aceite parcial já validado:** a demo `web/tiptap_demo.html` compila para JS e foi verificada em Chrome headless: digitação, `Ctrl+B`, `Ctrl+Z`/`Ctrl+Y`, `getTiptapHTML()` e `setEditable(false)` funcionam sem erros de console. O dropcursor foi validado por smoke de `dragover`, criando overlay `.prosemirror-dropcursor-*`. **Aceite final pendente:** digitar no meio de um documento de 200 páginas altera apenas o subtree DOM do parágrafo editado (verificável com `MutationObserver` no teste), latência < 16 ms.
 
 ---
 
@@ -129,7 +129,7 @@ Hoje `paginate()` reprocessa o documento inteiro. Para edição:
 - [x] `TiptapEditor`: `getHTML()`, `getJSON()`, `setEditable()`, `isActive(name, [attrs])` básico.
 - [ ] `TiptapEditor`: eventos (`onUpdate`, `onSelectionUpdate`, `onFocus`, `onBlur`) via `Stream`.
 - [x] `CommandManager` real mínimo (chaining: `editor.chain.focus().toggleBold().run()`).
-- [ ] Extensões restantes para paridade com a demo do tiptap.dev: `Heading`, `Strike`, `Code`, `Link`, `TextColor`/`Highlight`, `BulletList`/`OrderedList`/`ListItem`, `TextAlign`, `Image`, `Table` (+ row/cell/header), `HardBreak`, `HorizontalRule`, `History`, `Dropcursor`.
+- [ ] Extensões restantes para paridade com a demo do tiptap.dev: `Heading`, `Strike`, `Code`, `Link`, `TextColor`/`Highlight`, `BulletList`/`OrderedList`/`ListItem`, `TextAlign`, `Image`, `Table` (+ row/cell/header), `HardBreak`, `HorizontalRule`, `History`.
 
 ---
 
@@ -147,7 +147,7 @@ Referência visual: `referencias/tiptap.dev/tiptap.dev/index.html` (cópia Webfl
 ## 8. FASES DE EXECUÇÃO (ordem por caminho crítico)
 
 ### Fase 1 — View real do ProseMirror (bloqueia tudo)
-Itens de §3.1. **Status:** demo digitável com bold/undo/redo funcionando via teclado. **Pendente para fechar fase:** italic no smoke automatizado, teste de MutationObserver confirmando re-render localizado, e endurecimento de `domchange`/IME.
+Itens de §3.1. **Status:** demo digitável com bold/undo/redo funcionando via teclado; dropcursor visual validado em smoke. **Pendente para fechar fase:** italic no smoke automatizado, teste de MutationObserver confirmando re-render localizado, e endurecimento de `domchange`/IME.
 
 ### Fase 2 — Importação DOCX + documentos grandes
 Itens de §4.1 e §4.2. Aceite: DOCX grande de `resources/` abre com primeira página < 1,5 s (medido no harness Puppeteer com `performance.now()`), scroll fluido.

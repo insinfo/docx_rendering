@@ -38,7 +38,8 @@ class TiptapEditor {
   TiptapEditor(EditorOptions options) {
     extensionManager = ExtensionManager(options.extensions);
     final schema = extensionManager.createSchema();
-    _plugins = _defaultPlugins(schema, options.plugins);
+    _plugins = _defaultPlugins(
+        schema, [...extensionManager.createPlugins(), ...options.plugins]);
     state = EditorState.create(EditorStateConfig(
       schema: schema,
       doc: options.content ?? schema.topNodeType.createAndFill(),

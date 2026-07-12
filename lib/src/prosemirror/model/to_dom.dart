@@ -126,18 +126,19 @@ web.Document doc(web.Document? document) {
 }
 
 Map<String, web.Node?> renderSpec(web.Document document, DOMOutputSpec structure, [String? xmlNS, Map<String, dynamic>? blockArraysIn]) {
-  if (structure is web.Node) {
-    return {'dom': structure};
+  if (structure is String) {
+    return {'dom': document.createTextNode(structure)};
   }
   
   if (structure is Map) {
-    if (structure['dom'] is web.Node) {
+    if (structure.containsKey('dom')) {
       return {'dom': structure['dom'] as web.Node, 'contentDOM': structure['contentDOM'] as web.Node?};
     }
   }
 
   if (structure is! List) {
-    throw RangeError("Invalid array passed to renderSpec");
+    // If it's not a String, Map, or List, it must be a DOM node.
+    return {'dom': structure as web.Node};
   }
 
   List<dynamic> struct = structure;
