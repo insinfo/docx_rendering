@@ -3,7 +3,7 @@ import '../transform/index.dart';
 import 'selection.dart';
 import 'state.dart';
 
-typedef Command = bool Function(EditorState state, [void Function(Transaction tr)? dispatch]);
+typedef Command = bool Function(EditorState state, [void Function(Transaction tr)? dispatch, dynamic view]);
 
 const int UPDATED_SEL = 1;
 const int UPDATED_MARKS = 2;

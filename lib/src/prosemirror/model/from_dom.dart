@@ -39,7 +39,8 @@ abstract class ParseRule {
   String? mark;
   final bool? ignore;
   final bool? closeParent;
-  final bool? skip; // Note: skip could be a node in some cases in TS, we'll keep it simple
+  final bool?
+      skip; // Note: skip could be a node in some cases in TS, we'll keep it simple
   Map<String, dynamic>? attrs;
 
   ParseRule({
@@ -122,7 +123,8 @@ class DOMParser {
     }
 
     normalizeLists = !tags.any((r) {
-      if (!RegExp(r'^(ul|ol)\b').hasMatch(r.tag) || r.node == null) return false;
+      if (!RegExp(r'^(ul|ol)\b').hasMatch(r.tag) || r.node == null)
+        return false;
       NodeType node = schema.nodes[r.node]!;
       return node.contentMatch.matchType(node) != null;
     });
@@ -142,12 +144,14 @@ class DOMParser {
     return Slice.maxOpen(context.finish() as Fragment);
   }
 
-  TagParseRule? matchTag(web.Node dom, ParseContext context, [TagParseRule? after]) {
+  TagParseRule? matchTag(web.Node dom, ParseContext context,
+      [TagParseRule? after]) {
     int start = after != null ? tags.indexOf(after) + 1 : 0;
     for (int i = start; i < tags.length; i++) {
       TagParseRule rule = tags[i];
       if (_matches(dom, rule.tag) &&
-          (rule.namespace == null || (dom is web.Element && dom.namespaceURI == rule.namespace)) &&
+          (rule.namespace == null ||
+              (dom is web.Element && dom.namespaceURI == rule.namespace)) &&
           (rule.context == null || context.matchesContext(rule.context!))) {
         if (rule.getAttrs != null && dom is web.HTMLElement) {
           dynamic result = rule.getAttrs!(dom);
@@ -160,7 +164,8 @@ class DOMParser {
     return null;
   }
 
-  StyleParseRule? matchStyle(String prop, String value, ParseContext context, [StyleParseRule? after]) {
+  StyleParseRule? matchStyle(String prop, String value, ParseContext context,
+      [StyleParseRule? after]) {
     int start = after != null ? styles.indexOf(after) + 1 : 0;
     for (int i = start; i < styles.length; i++) {
       StyleParseRule rule = styles[i];
@@ -168,7 +173,8 @@ class DOMParser {
       if (!style.startsWith(prop) ||
           (rule.context != null && !context.matchesContext(rule.context!)) ||
           (style.length > prop.length &&
-              (style.codeUnitAt(prop.length) != 61 || style.substring(prop.length + 1) != value))) {
+              (style.codeUnitAt(prop.length) != 61 ||
+                  style.substring(prop.length + 1) != value))) {
         continue;
       }
       if (rule.getAttrs != null) {
@@ -198,7 +204,9 @@ class DOMParser {
       if (parseDOM != null) {
         for (var rule in parseDOM) {
           ParseRule newRule = _copyRule(rule);
-          if (!(newRule.mark != null || newRule.ignore == true || (newRule is StyleParseRule && newRule.clearMark != null))) {
+          if (!(newRule.mark != null ||
+              newRule.ignore == true ||
+              (newRule is StyleParseRule && newRule.clearMark != null))) {
             newRule.mark = name;
           }
           insert(newRule);
@@ -211,7 +219,9 @@ class DOMParser {
       if (parseDOM != null) {
         for (var rule in parseDOM) {
           TagParseRule newRule = _copyRule(rule) as TagParseRule;
-          if (newRule.node == null && newRule.ignore != true && newRule.mark == null) {
+          if (newRule.node == null &&
+              newRule.ignore != true &&
+              newRule.mark == null) {
             newRule.node = name;
           }
           insert(newRule);
@@ -223,7 +233,8 @@ class DOMParser {
   }
 
   static DOMParser fromSchema(Schema schema) {
-    schema.cached['domParser'] ??= DOMParser(schema, DOMParser.schemaRules(schema));
+    schema.cached['domParser'] ??=
+        DOMParser(schema, DOMParser.schemaRules(schema));
     return schema.cached['domParser'] as DOMParser;
   }
 }
@@ -266,15 +277,48 @@ ParseRule _copyRule(ParseRule rule) {
 }
 
 const blockTags = {
-  "address": true, "article": true, "aside": true, "blockquote": true, "body": true, "canvas": true,
-  "dd": true, "div": true, "dl": true, "fieldset": true, "figcaption": true, "figure": true,
-  "footer": true, "form": true, "h1": true, "h2": true, "h3": true, "h4": true, "h5": true,
-  "h6": true, "header": true, "hgroup": true, "hr": true, "li": true, "noscript": true, "ol": true,
-  "output": true, "p": true, "pre": true, "section": true, "table": true, "tfoot": true, "ul": true
+  "address": true,
+  "article": true,
+  "aside": true,
+  "blockquote": true,
+  "body": true,
+  "canvas": true,
+  "dd": true,
+  "div": true,
+  "dl": true,
+  "fieldset": true,
+  "figcaption": true,
+  "figure": true,
+  "footer": true,
+  "form": true,
+  "h1": true,
+  "h2": true,
+  "h3": true,
+  "h4": true,
+  "h5": true,
+  "h6": true,
+  "header": true,
+  "hgroup": true,
+  "hr": true,
+  "li": true,
+  "noscript": true,
+  "ol": true,
+  "output": true,
+  "p": true,
+  "pre": true,
+  "section": true,
+  "table": true,
+  "tfoot": true,
+  "ul": true
 };
 
 const ignoreTags = {
-  "head": true, "noscript": true, "object": true, "script": true, "style": true, "title": true
+  "head": true,
+  "noscript": true,
+  "object": true,
+  "script": true,
+  "style": true,
+  "title": true
 };
 
 const listTags = {"ol": true, "ul": true};
@@ -286,9 +330,11 @@ const int OPT_OPEN_LEFT = 4;
 int _wsOptionsFor(NodeType? type, dynamic preserveWhitespace, int base) {
   if (preserveWhitespace != null) {
     return (preserveWhitespace != false ? OPT_PRESERVE_WS : 0) |
-           (preserveWhitespace == "full" ? OPT_PRESERVE_WS_FULL : 0);
+        (preserveWhitespace == "full" ? OPT_PRESERVE_WS_FULL : 0);
   }
-  return type != null && type.whitespace == "pre" ? OPT_PRESERVE_WS | OPT_PRESERVE_WS_FULL : base & ~OPT_OPEN_LEFT;
+  return type != null && type.whitespace == "pre"
+      ? OPT_PRESERVE_WS | OPT_PRESERVE_WS_FULL
+      : base & ~OPT_OPEN_LEFT;
 }
 
 class NodeContext {
@@ -300,14 +346,17 @@ class NodeContext {
   int options;
   List<PMNode> content = [];
 
-  NodeContext(this.type, this.attrs, this.marks, this.solid, ContentMatch? match, this.options) {
-    this.match = match ?? ((options & OPT_OPEN_LEFT) > 0 ? null : type?.contentMatch);
+  NodeContext(this.type, this.attrs, this.marks, this.solid,
+      ContentMatch? match, this.options) {
+    this.match =
+        match ?? ((options & OPT_OPEN_LEFT) > 0 ? null : type?.contentMatch);
   }
 
   List<NodeType>? findWrapping(NodeType nodeType) {
     if (match == null) {
       if (type == null) return [];
-      Fragment? fill = type!.contentMatch.fillBefore(Fragment.empty); // Simplified from Fragment.from(node)
+      Fragment? fill = type!.contentMatch
+          .fillBefore(Fragment.empty); // Simplified from Fragment.from(node)
       if (fill != null) {
         match = type!.contentMatch.matchFragment(fill);
       } else {
@@ -334,7 +383,8 @@ class NodeContext {
           if (text.length == m.group(0)!.length) {
             content.removeLast();
           } else {
-            content[content.length - 1] = (last as TextNode).withText(text.substring(0, text.length - m.group(0)!.length));
+            content[content.length - 1] = (last as TextNode)
+                .withText(text.substring(0, text.length - m.group(0)!.length));
           }
         }
       }
@@ -362,7 +412,7 @@ class ParseContext {
   final DOMParser parser;
   final ParseOptions options;
   final bool isOpen;
-  
+
   int open = 0;
   List<Map<String, dynamic>>? find;
   bool needsBlock = false;
@@ -371,16 +421,18 @@ class ParseContext {
 
   ParseContext(this.parser, this.options, this.isOpen) {
     PMNode? topNode = options.topNode;
-    int topOptions = _wsOptionsFor(null, options.preserveWhitespace, 0) | (isOpen ? OPT_OPEN_LEFT : 0);
-    
+    int topOptions = _wsOptionsFor(null, options.preserveWhitespace, 0) |
+        (isOpen ? OPT_OPEN_LEFT : 0);
+
     NodeContext topContext;
     if (topNode != null) {
       topContext = NodeContext(topNode.type, topNode.attrs, [], true,
-                               options.topMatch ?? topNode.type.contentMatch, topOptions);
+          options.topMatch ?? topNode.type.contentMatch, topOptions);
     } else if (isOpen) {
       topContext = NodeContext(null, null, [], true, null, topOptions);
     } else {
-      topContext = NodeContext(parser.schema.topNodeType, null, [], true, null, topOptions);
+      topContext = NodeContext(
+          parser.schema.topNodeType, null, [], true, null, topOptions);
     }
     nodes = [topContext];
     find = options.findPositions;
@@ -399,49 +451,63 @@ class ParseContext {
   void addTextNode(web.Text dom, List<Mark> marks) {
     String value = dom.data;
     NodeContext topContext = top;
-    dynamic preserveWS = (topContext.options & OPT_PRESERVE_WS_FULL) > 0 ? "full"
+    dynamic preserveWS = (topContext.options & OPT_PRESERVE_WS_FULL) > 0
+        ? "full"
         : localPreserveWS || (topContext.options & OPT_PRESERVE_WS) > 0;
     Schema schema = parser.schema;
 
-    if (preserveWS == "full" || topContext.inlineContext(dom) || RegExp(r'[^ \t\r\n\u000c]').hasMatch(value)) {
+    if (preserveWS == "full" ||
+        topContext.inlineContext(dom) ||
+        RegExp(r'[^ \t\r\n\u000c]').hasMatch(value)) {
       if (preserveWS != "full" && preserveWS != true) {
         value = value.replaceAll(RegExp(r'[ \t\r\n\u000c]+'), " ");
-        if (RegExp(r'^[ \t\r\n\u000c]').hasMatch(value) && open == nodes.length - 1) {
-          PMNode? nodeBefore = topContext.content.isNotEmpty ? topContext.content.last : null;
+        if (RegExp(r'^[ \t\r\n\u000c]').hasMatch(value) &&
+            open == nodes.length - 1) {
+          PMNode? nodeBefore =
+              topContext.content.isNotEmpty ? topContext.content.last : null;
           web.Node? domNodeBefore = dom.previousSibling;
           if (nodeBefore == null ||
               (domNodeBefore is web.Element && domNodeBefore.tagName == 'BR') ||
-              (nodeBefore.isText && RegExp(r'[ \t\r\n\u000c]$').hasMatch(nodeBefore.text!))) {
+              (nodeBefore.isText &&
+                  RegExp(r'[ \t\r\n\u000c]$').hasMatch(nodeBefore.text!))) {
             value = value.substring(1);
           }
         }
       } else if (preserveWS == "full") {
         value = value.replaceAll(RegExp(r'\r\n?'), "\n");
-      } else if (schema.linebreakReplacement != null && RegExp(r'[\r\n]').hasMatch(value) && topContext.findWrapping(schema.linebreakReplacement!) != null) {
+      } else if (schema.linebreakReplacement != null &&
+          RegExp(r'[\r\n]').hasMatch(value) &&
+          topContext.findWrapping(schema.linebreakReplacement!) != null) {
         List<String> lines = value.split(RegExp(r'\r?\n|\r'));
         for (int i = 0; i < lines.length; i++) {
-          if (i > 0) insertNode(schema.linebreakReplacement!.create(), marks, true);
-          if (lines[i].isNotEmpty) insertNode(schema.text(lines[i]), marks, !RegExp(r'\S').hasMatch(lines[i]));
+          if (i > 0)
+            insertNode(schema.linebreakReplacement!.create(), marks, true);
+          if (lines[i].isNotEmpty)
+            insertNode(schema.text(lines[i]), marks,
+                !RegExp(r'\S').hasMatch(lines[i]));
         }
         value = "";
       } else {
         value = value.replaceAll(RegExp(r'\r?\n|\r'), " ");
       }
-      if (value.isNotEmpty) insertNode(schema.text(value), marks, !RegExp(r'\S').hasMatch(value));
+      if (value.isNotEmpty)
+        insertNode(schema.text(value), marks, !RegExp(r'\S').hasMatch(value));
       findInText(dom);
     } else {
       findInside(dom);
     }
   }
 
-  void addElement(web.HTMLElement dom, List<Mark> marks, [TagParseRule? matchAfter]) {
+  void addElement(web.HTMLElement dom, List<Mark> marks,
+      [TagParseRule? matchAfter]) {
     bool outerWS = localPreserveWS;
     NodeContext topContext = top;
     if (dom.tagName == "PRE") localPreserveWS = true;
-    
+
     String name = dom.tagName.toLowerCase();
-    if (listTags.containsKey(name) && parser.normalizeLists) _normalizeList(dom);
-    
+    if (listTags.containsKey(name) && parser.normalizeLists)
+      _normalizeList(dom);
+
     TagParseRule? rule;
     if (options.ruleFromNode != null) {
       rule = options.ruleFromNode!(dom);
@@ -455,7 +521,7 @@ class ParseContext {
       ignoreFallback(dom, marks);
     } else if (rule == null || rule.skip == true || rule.closeParent == true) {
       if (rule != null && rule.closeParent == true) open = max(0, open - 1);
-      
+
       bool sync = false;
       bool oldNeedsBlock = needsBlock;
       if (blockTags.containsKey(name)) {
@@ -471,28 +537,35 @@ class ParseContext {
         return;
       }
 
-      List<Mark>? innerMarks = (rule != null && rule.skip == true) ? marks : readStyles(dom, marks);
+      List<Mark>? innerMarks =
+          (rule != null && rule.skip == true) ? marks : readStyles(dom, marks);
       if (innerMarks != null) addAll(dom, innerMarks);
       if (sync) this.sync(topContext);
       needsBlock = oldNeedsBlock;
     } else {
       List<Mark>? innerMarks = readStyles(dom, marks);
       if (innerMarks != null) {
-        addElementByRule(dom, rule, innerMarks, rule.consuming == false ? rule : null);
+        addElementByRule(
+            dom, rule, innerMarks, rule.consuming == false ? rule : null);
       }
     }
     localPreserveWS = outerWS;
   }
 
   void leafFallback(web.Node dom, List<Mark> marks) {
-    if (dom is web.Element && dom.tagName == "BR" && top.type != null && top.type!.inlineContent) {
+    if (dom is web.Element &&
+        dom.tagName == "BR" &&
+        top.type != null &&
+        top.type!.inlineContent) {
       // Create text node equivalent of "\n" ?
       // Simplified: Just ignore for now or add schema text
     }
   }
 
   void ignoreFallback(web.Node dom, List<Mark> marks) {
-    if (dom is web.Element && dom.tagName == "BR" && (top.type == null || !top.type!.inlineContent)) {
+    if (dom is web.Element &&
+        dom.tagName == "BR" &&
+        (top.type == null || !top.type!.inlineContent)) {
       findPlace(parser.schema.text("-"), marks, true);
     }
   }
@@ -502,19 +575,23 @@ class ParseContext {
     return marks;
   }
 
-  void addElementByRule(web.HTMLElement dom, TagParseRule rule, List<Mark> marks, [TagParseRule? continueAfter]) {
+  void addElementByRule(
+      web.HTMLElement dom, TagParseRule rule, List<Mark> marks,
+      [TagParseRule? continueAfter]) {
     bool sync = false;
     NodeType? nodeType;
     if (rule.node != null) {
       nodeType = parser.schema.nodes[rule.node];
       if (nodeType != null) {
         if (!nodeType.isLeaf) {
-          List<Mark>? inner = enter(nodeType, rule.attrs, marks, rule.preserveWhitespace);
+          List<Mark>? inner =
+              enter(nodeType, rule.attrs, marks, rule.preserveWhitespace);
           if (inner != null) {
             sync = true;
             marks = inner;
           }
-        } else if (!insertNode(nodeType.create(rule.attrs), marks, dom.tagName == "BR")) {
+        } else if (!insertNode(
+            nodeType.create(rule.attrs), marks, dom.tagName == "BR")) {
           leafFallback(dom, marks);
         }
       }
@@ -522,7 +599,7 @@ class ParseContext {
       MarkType markType = parser.schema.marks[rule.mark!]!;
       marks = List.from(marks)..add(markType.create(rule.attrs));
     }
-    
+
     NodeContext startIn = top;
 
     if (nodeType != null && nodeType.isLeaf) {
@@ -542,7 +619,7 @@ class ParseContext {
       } else if (rule.contentElement is Function) {
         contentDOM = (rule.contentElement as Function)(dom);
       }
-      
+
       findAround(dom, contentDOM, true);
       addAll(contentDOM, marks);
       findAround(dom, contentDOM, false);
@@ -550,11 +627,13 @@ class ParseContext {
     if (sync && this.sync(startIn)) open--;
   }
 
-  void addAll(web.Node parent, List<Mark> marks, [int? startIndex, int? endIndex]) {
+  void addAll(web.Node parent, List<Mark> marks,
+      [int? startIndex, int? endIndex]) {
     int index = startIndex ?? 0;
-    web.Node? dom = startIndex != null ? _childAt(parent, startIndex) : parent.firstChild;
+    web.Node? dom =
+        startIndex != null ? _childAt(parent, startIndex) : parent.firstChild;
     web.Node? end = endIndex != null ? _childAt(parent, endIndex) : null;
-    
+
     for (; dom != null && dom != end; dom = dom.nextSibling, ++index) {
       findAtPoint(parent, index);
       addDOM(dom, marks);
@@ -574,7 +653,8 @@ class ParseContext {
     for (int depth = open, penalty = 0; depth >= 0; depth--) {
       NodeContext cx = nodes[depth];
       List<NodeType>? found = cx.findWrapping(node.type);
-      if (found != null && (route == null || route.length > found.length + penalty)) {
+      if (found != null &&
+          (route == null || route.length > found.length + penalty)) {
         route = found;
         syncCtx = cx;
         if (found.isEmpty) break;
@@ -601,10 +681,13 @@ class ParseContext {
     if (innerMarks != null) {
       closeExtra();
       NodeContext topContext = top;
-      if (topContext.match != null) topContext.match = topContext.match!.matchType(node.type);
+      if (topContext.match != null)
+        topContext.match = topContext.match!.matchType(node.type);
       List<Mark> nodeMarks = [];
       for (Mark m in [...innerMarks, ...node.marks]) {
-        if (topContext.type != null ? topContext.type!.allowsMarkType(m.type) : _markMayApply(m.type, node.type)) {
+        if (topContext.type != null
+            ? topContext.type!.allowsMarkType(m.type)
+            : _markMayApply(m.type, node.type)) {
           nodeMarks = m.addToSet(nodeMarks);
         }
       }
@@ -614,29 +697,38 @@ class ParseContext {
     return false;
   }
 
-  List<Mark>? enter(NodeType type, Map<String, dynamic>? attrs, List<Mark> marks, [dynamic preserveWS]) {
+  List<Mark>? enter(
+      NodeType type, Map<String, dynamic>? attrs, List<Mark> marks,
+      [dynamic preserveWS]) {
     List<Mark>? innerMarks = findPlace(type.create(attrs), marks, false);
-    if (innerMarks != null) innerMarks = enterInner(type, attrs, marks, true, preserveWS);
+    if (innerMarks != null)
+      innerMarks = enterInner(type, attrs, marks, true, preserveWS);
     return innerMarks;
   }
 
-  List<Mark> enterInner(NodeType type, Map<String, dynamic>? attrs, List<Mark> marks, [bool solid = false, dynamic preserveWS]) {
+  List<Mark> enterInner(
+      NodeType type, Map<String, dynamic>? attrs, List<Mark> marks,
+      [bool solid = false, dynamic preserveWS]) {
     closeExtra();
     NodeContext topContext = top;
-    if (topContext.match != null) topContext.match = topContext.match!.matchType(type);
+    if (topContext.match != null)
+      topContext.match = topContext.match!.matchType(type);
     int options = _wsOptionsFor(type, preserveWS, topContext.options);
-    if ((topContext.options & OPT_OPEN_LEFT) > 0 && topContext.content.isEmpty) options |= OPT_OPEN_LEFT;
-    
+    if ((topContext.options & OPT_OPEN_LEFT) > 0 && topContext.content.isEmpty)
+      options |= OPT_OPEN_LEFT;
+
     List<Mark> applyMarks = [];
     List<Mark> nextMarks = [];
     for (Mark m in marks) {
-      if (topContext.type != null ? topContext.type!.allowsMarkType(m.type) : _markMayApply(m.type, type)) {
+      if (topContext.type != null
+          ? topContext.type!.allowsMarkType(m.type)
+          : _markMayApply(m.type, type)) {
         applyMarks = m.addToSet(applyMarks);
       } else {
         nextMarks.add(m);
       }
     }
-    
+
     nodes.add(NodeContext(type, attrs, applyMarks, solid, null, options));
     open++;
     return nextMarks;
@@ -684,14 +776,46 @@ class ParseContext {
   }
 
   void findAtPoint(web.Node parent, int offset) {
-    // Optional metrics mapping
+    if (find == null) return;
+    for (final found in find!) {
+      if (found['node'] == parent && found['offset'] == offset) {
+        found['pos'] = currentPos;
+      }
+    }
   }
 
-  void findInside(web.Node parent) {}
+  void findInside(web.Node parent) {
+    if (find == null || parent.nodeType != 1) return;
+    final element = parent as web.Element;
+    for (final found in find!) {
+      final node = found['node'];
+      if (found['pos'] == null && node is web.Node && element.contains(node)) {
+        found['pos'] = currentPos;
+      }
+    }
+  }
 
-  void findAround(web.Node parent, web.Node content, bool before) {}
+  void findAround(web.Node parent, web.Node content, bool before) {
+    if (find == null || parent == content || parent.nodeType != 1) return;
+    final element = parent as web.Element;
+    for (final found in find!) {
+      final node = found['node'];
+      if (found['pos'] == null && node is web.Node && element.contains(node)) {
+        final pos = content.compareDocumentPosition(node);
+        if ((pos & (before ? 2 : 4)) != 0) found['pos'] = currentPos;
+      }
+    }
+  }
 
-  void findInText(web.Text textNode) {}
+  void findInText(web.Text textNode) {
+    if (find == null) return;
+    for (final found in find!) {
+      if (found['node'] == textNode) {
+        found['pos'] = currentPos -
+            ((textNode.nodeValue?.length ?? 0) - (found['offset'] as int));
+      }
+    }
+  }
 
   bool matchesContext(String context) {
     return false; // Simplified
@@ -701,8 +825,10 @@ class ParseContext {
     ResolvedPos? ctx = options.context;
     if (ctx != null) {
       for (int d = ctx.depth; d >= 0; d--) {
-        NodeType? deflt = ctx.node(d).contentMatchAt(ctx.indexAfter(d)).defaultType;
-        if (deflt != null && deflt.isTextblock && deflt.defaultAttrs.isNotEmpty) return deflt;
+        NodeType? deflt =
+            ctx.node(d).contentMatchAt(ctx.indexAfter(d)).defaultType;
+        if (deflt != null && deflt.isTextblock && deflt.defaultAttrs.isNotEmpty)
+          return deflt;
       }
     }
     for (String name in parser.schema.nodes.keys) {
@@ -742,7 +868,7 @@ bool _markMayApply(MarkType markType, NodeType nodeType) {
   for (String name in nodes.keys) {
     NodeType parent = nodes[name]!;
     if (!parent.allowsMarkType(markType)) continue;
-    
+
     List<ContentMatch> seen = [];
     bool scan(ContentMatch match) {
       seen.add(match);
@@ -753,6 +879,7 @@ bool _markMayApply(MarkType markType, NodeType nodeType) {
       }
       return false;
     }
+
     if (scan(parent.contentMatch)) return true;
   }
   return false;

@@ -1,11 +1,17 @@
 import 'package:web/web.dart' as web;
 
 import '../state/index.dart';
+import 'decoration.dart';
+import 'dom.dart';
+import 'domcoords.dart' as domcoords;
+import 'domchange.dart';
 import 'domobserver.dart';
 import 'input.dart';
+import 'selection.dart';
 import 'viewdesc.dart';
 
-typedef HandleDOMEvents = Map<String, dynamic Function(EditorView view, dynamic event)>;
+typedef HandleDOMEvents
+    = Map<String, dynamic Function(EditorView view, dynamic event)>;
 typedef NodeViews = Map<String, dynamic>;
 typedef MarkViews = Map<String, dynamic>;
 typedef Attributes = Map<String, String>;
@@ -15,7 +21,8 @@ class EditorProps {
   final dynamic Function(EditorView view, dynamic event)? handleKeyDown;
   final dynamic Function(EditorView view, dynamic event)? handlePaste;
   final dynamic Function(EditorView view, dynamic event)? handleDrop;
-  final dynamic Function(EditorView view, dynamic event)? handleScrollToSelection;
+  final dynamic Function(EditorView view, dynamic event)?
+      handleScrollToSelection;
   final HandleDOMEvents? handleDOMEvents;
   final Attributes Function(EditorState state)? attributes;
   final dynamic Function(EditorState state)? decorations;
@@ -66,10 +73,18 @@ class EditorView {
   EditorState state;
   DirectEditorProps _props;
   final List<Plugin> directPlugins;
-  ViewDesc? docView;
+  late NodeViewDesc docView;
   late final DOMObserver domObserver;
+  late InputState input;
   bool mounted = false;
   bool focused = false;
+  web.Node? trackWrites;
+  List<dynamic>? markCursor;
+  CursorWrapper? cursorWrapper;
+  Map<String, dynamic> nodeViews = {};
+  ViewDesc? lastSelectedViewDesc;
+  Dragging? dragging;
+  bool requiresGeckoHackNode = false;
 
   EditorView(web.HTMLElement? place, DirectEditorProps props)
       : state = props.state,
@@ -77,14 +92,22 @@ class EditorView {
         directPlugins = List<Plugin>.from(props.plugins ?? const []) {
     dom = web.document.createElement('div') as web.HTMLElement;
     dom.classList.add('ProseMirror');
-    dom.setAttribute('contenteditable', 'true');
+    editable = getEditable(this);
+    dom.setAttribute('contenteditable', editable ? 'true' : 'false');
 
     if (place != null) {
       place.appendChild(dom);
       mounted = true;
     }
 
-    domObserver = DOMObserver(this);
+    input = InputState();
+    nodeViews = buildNodeViews(this);
+    docView = docViewDesc(
+        state.doc, computeDocDeco(this), viewDecorations(this), dom, this);
+    domObserver = DOMObserver(this, (from, to, typeOver, added) {
+      readDOMChange(this, from, to, typeOver, added);
+    });
+    domObserver.start();
     initInput(this);
   }
 
@@ -101,9 +124,31 @@ class EditorView {
   }
 
   void updateState(EditorState newState) {
+    updateStateInner(newState, _props);
+  }
+
+  void updateStateInner(EditorState newState, EditorProps prevProps) {
+    final prev = state;
+    var updateSel = !newState.selection.eq(prev.selection);
+    if (newState.storedMarks != null && composing) {
+      clearComposition(this);
+      updateSel = true;
+    }
     state = newState;
-    if (docView != null) {
-      docView!.update(state.doc, null, null, this);
+    editable = getEditable(this);
+    dom.setAttribute('contenteditable', editable ? 'true' : 'false');
+    final innerDeco = viewDecorations(this);
+    final outerDeco = computeDocDeco(this);
+    final updateDoc = !docView.matchesNode(state.doc, outerDeco, innerDeco);
+    if (updateDoc || updateSel) {
+      domObserver.stop();
+      if (updateDoc && !docView.update(state.doc, outerDeco, innerDeco, this)) {
+        docView.updateOuterDeco(outerDeco);
+        docView.destroy();
+        docView = docViewDesc(state.doc, outerDeco, innerDeco, dom, this);
+      }
+      selectionToDOM(this, updateDoc);
+      domObserver.start();
     }
   }
 
@@ -117,15 +162,27 @@ class EditorView {
 
   dynamic someProp(String propName, [dynamic Function(dynamic value)? f]) {
     dynamic value = _readProp(_props, propName);
-    if (value != null && (f == null || f(value) != null)) return f == null ? value : f(value);
+    if (value != null) {
+      if (f == null) return value;
+      final result = f(value);
+      if (result != null) return result;
+    }
 
     for (final plugin in directPlugins) {
       value = plugin.props[propName];
-      if (value != null && (f == null || f(value) != null)) return f == null ? value : f(value);
+      if (value != null) {
+        if (f == null) return value;
+        final result = f(value);
+        if (result != null) return result;
+      }
     }
     for (final plugin in state.plugins) {
       value = plugin.props[propName];
-      if (value != null && (f == null || f(value) != null)) return f == null ? value : f(value);
+      if (value != null) {
+        if (f == null) return value;
+        final result = f(value);
+        if (result != null) return result;
+      }
     }
     return null;
   }
@@ -133,16 +190,54 @@ class EditorView {
   void destroy() {
     destroyInput(this);
     domObserver.stop();
-    docView?.destroy();
+    docView.destroy();
     if (dom.parentNode != null) {
       dom.parentNode!.removeChild(dom);
     }
   }
 
-  bool get editable {
-    final value = _props.editable;
-    return value == null ? true : value(state);
+  late bool editable;
+
+  bool get composing => input.composing;
+
+  dynamic get root => dom.getRootNode();
+
+  web.Selection? domSelection() {
+    final currentRoot = root;
+    if (currentRoot is web.Document) return currentRoot.getSelection();
+    return dom.ownerDocument?.getSelection();
   }
+
+  DOMSelectionRange domSelectionRange() {
+    final sel = domSelection();
+    return DOMSelectionRange(
+      focusNode: sel?.focusNode,
+      focusOffset: sel?.focusOffset ?? 0,
+      anchorNode: sel?.anchorNode,
+      anchorOffset: sel?.anchorOffset ?? 0,
+    );
+  }
+
+  bool hasFocus() {
+    final active = dom.ownerDocument == null
+        ? null
+        : deepActiveElement(dom.ownerDocument!);
+    return focused || active == dom || (active != null && dom.contains(active));
+  }
+
+  void focus() {
+    dom.focus();
+    focused = true;
+  }
+
+  DOMPosition domAtPos(int pos, [int side = 0]) =>
+      docView.domFromPos(pos, side);
+
+  domcoords.PosAtCoordsResult? posAtCoords(domcoords.ViewCoords coords) =>
+      domcoords.posAtCoords(this, coords);
+
+  domcoords.Rect coordsAtPos(int pos, [int side = 1]) =>
+      domcoords.coordsAtPos(this, pos, side);
 
   dynamic _readProp(EditorProps props, String name) {
     switch (name) {
@@ -166,8 +261,55 @@ class EditorView {
         return props.nodeViews;
       case 'markViews':
         return props.markViews;
+      case 'createSelectionBetween':
+        return null;
       default:
         return null;
     }
   }
+}
+
+class CursorWrapper {
+  final web.Node dom;
+  final Decoration deco;
+
+  CursorWrapper(this.dom, this.deco);
+}
+
+bool getEditable(EditorView view) {
+  final value = view._props.editable;
+  return value == null ? true : value(view.state);
+}
+
+Map<String, dynamic> buildNodeViews(EditorView view) {
+  final result = <String, dynamic>{};
+  final directNodes = view._props.nodeViews;
+  final directMarks = view._props.markViews;
+  if (directNodes != null) result.addAll(directNodes);
+  if (directMarks != null) result.addAll(directMarks);
+  view.someProp('nodeViews', (dynamic value) {
+    if (value is Map<String, dynamic>) result.addAll(value);
+    return null;
+  });
+  view.someProp('markViews', (dynamic value) {
+    if (value is Map<String, dynamic>) result.addAll(value);
+    return null;
+  });
+  return result;
+}
+
+List<Decoration> computeDocDeco(EditorView view) {
+  final attrs = <String, dynamic>{
+    'class': 'ProseMirror',
+    'contenteditable': view.editable ? 'true' : 'false',
+  };
+  final customAttrs = view.someProp('attributes', (dynamic value) {
+    return value is Function ? value(view.state) : value;
+  });
+  if (customAttrs is Map) {
+    for (final entry in customAttrs.entries) {
+      attrs[entry.key.toString()] = entry.value?.toString();
+    }
+  }
+  return [Decoration.node(0, view.state.doc.content.size, attrs)];
 }

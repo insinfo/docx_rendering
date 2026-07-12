@@ -319,7 +319,12 @@ class NodeSpec {
   final bool? linebreakReplacement;
   final List<dynamic>? parseDOM;
   final dynamic Function(PMNode)? toDOM;
-  
+
+  /// Experimental prosemirror-view kludge: when true, the view re-parses the
+  /// node from the DOM instead of relying on its view desc (TS accesses this
+  /// through NodeSpec's index signature).
+  final bool? reparseInView;
+
   final String? Function(PMNode)? leafText;
   final String? Function(PMNode)? toDebugString;
 
@@ -341,6 +346,7 @@ class NodeSpec {
     this.linebreakReplacement,
     this.parseDOM,
     this.toDOM,
+    this.reparseInView,
     this.leafText,
     this.toDebugString,
   });
@@ -356,6 +362,11 @@ class MarkSpec {
   final List<dynamic>? parseDOM;
   final dynamic Function(Mark, bool)? toDOM;
 
+  /// Experimental prosemirror-view kludge: when true, the view re-parses the
+  /// mark from the DOM instead of relying on its view desc (TS accesses this
+  /// through MarkSpec's index signature).
+  final bool? reparseInView;
+
   MarkSpec({
     this.attrs,
     this.inclusive,
@@ -365,6 +376,7 @@ class MarkSpec {
     this.code,
     this.parseDOM,
     this.toDOM,
+    this.reparseInView,
   });
 }
 

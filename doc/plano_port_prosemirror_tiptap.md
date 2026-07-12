@@ -1,7 +1,7 @@
 # ESPECIFICAÇÃO TÉCNICA E ARQUITETURAL COMPLETA: PORTABILIDADE PROSEMIRROR & TIPTAP PARA DART
 
 Este é o documento definitivo e exaustivo para a reescrita do ecossistema ProseMirror e Tiptap em Dart puro. Este documento detalha as assinaturas de classes, a arquitetura de módulos, os padrões de conversão de TypeScript para Dart e a implementação passo a passo.
-
+https://code.haverbeke.berlin/prosemirror
 ---
 
 ## 1. DIRETRIZES DE ENGENHARIA E CONVERSÃO DE TIPOS
@@ -622,19 +622,34 @@ Para evitar o colapso cognitivo e erros de compilação em cascata, a codificaç
 - [x] Validar a suíte `test/prosemirror/state/test_state.dart`.
 
 ### Etapa E: A Interface Gráfica (Módulo View)
-- [x] Criar `lib/src/prosemirror/view/dom.dart` (Básicos `package:web`).
-- [x] Criar `lib/src/prosemirror/view/viewdesc.dart`.
-- [x] Criar `lib/src/prosemirror/view/domobserver.dart`.
-- [x] Criar `lib/src/prosemirror/view/input.dart` (Event listeners).
-- [x] Criar `lib/src/prosemirror/view/index.dart` (`EditorView`).
-- [x] Scaffold inicial validado com `dart analyze lib/src/prosemirror lib/src/tiptap test/prosemirror test/tiptap`.
+**Status real em jul/2026: view funcional inicial.** A antiga camada stub foi substituída por um porte substancial de `prosemirror-view`: `viewdesc.dart` tem a árvore `ViewDesc`/`NodeViewDesc`/`TextViewDesc`/`MarkViewDesc`, `domobserver.dart` usa `MutationObserver`, `input.dart` despacha `handleDOMEvents`/`handleKeyDown`, e `EditorView` constrói `docViewDesc`, sincroniza seleção e integra plugins. Ainda há atalhos pragmáticos no leitor de mudanças DOM, mas a demo web já é digitável com bold/undo/redo.
+
+- [x] Criar `lib/src/prosemirror/view/dom.dart` com helpers DOM reais (`domIndex`, seleção, `pmViewDesc`, caret APIs).
+- [x] Criar `lib/src/prosemirror/view/viewdesc.dart` real com diffing incremental e renderização de descs.
+- [x] Criar `lib/src/prosemirror/view/domobserver.dart` com `MutationObserver`, fila de mutações e flush.
+- [x] Criar `lib/src/prosemirror/view/input.dart` com event listeners, `InputState`, composição e dispatch de plugin props.
+- [x] Criar `lib/src/prosemirror/view/index.dart` (`EditorView`) integrado a `docViewDesc`, plugins, seleção e foco.
+- [x] Criar/portar `browser.dart`, `clipboard.dart`, `decoration.dart`, `domcoords.dart`, `selection.dart`, `capturekeys.dart` e `domchange.dart`.
+- [x] Validar com `dart analyze`, `dart analyze lib/src/prosemirror/view/` e compile JS da demo.
+
+### Etapa E2: View Funcional (pendente — detalhada em `doc/plano_editor_completo.md` §3)
+Portar de `referencias/prosemirror-view/src/`:
+- [x] `viewdesc.dart` real: hierarquia `ViewDesc`/`NodeViewDesc`/`TextViewDesc`/`MarkViewDesc` com diffing incremental (`updateChildren`).
+- [x] `domobserver.dart` real inicial: `MutationObserver` + reconciliação de edições nativas via região suja.
+- [x] `input.dart` real inicial: keydown → keymap, composição IME, beforeinput e handlers.
+- [x] `clipboard.dart`: copy/cut/paste com `DOMSerializer`/`parseSlice`.
+- [x] Sincronização de seleção DOM ↔ `Selection` do state.
+- [x] `decoration.dart`: `Decoration.widget/inline/node` + `DecorationSet`.
+- [ ] Portar `prosemirror-dropcursor` (fonte em `referencias/prosemirror-dropcursor`).
+
+**Aceite parcial já validado:** `web/tiptap_demo.html` compila para JS e, em Chrome headless via Playwright, aceita digitação, `Ctrl+B`, `Ctrl+Z`/`Ctrl+Y`, `getTiptapHTML()` e `setEditable(false)` sem erros de console.
 
 ### Etapa F: A Ergonomia (Tiptap Core & Extensions)
 - [x] Criar `lib/src/tiptap/core/extension_manager.dart`.
-- [x] Criar `lib/src/tiptap/core/command_manager.dart`.
+- [x] Criar `lib/src/tiptap/core/command_manager.dart` com chain mínimo (`focus`, `toggleBold`, `toggleItalic`, `undo`, `redo`, `run`).
 - [x] Criar extensões base abstratas (`Extension`, `Node`, `Mark`).
-- [x] Criar `lib/src/tiptap/core/editor.dart`.
-- [ ] Construir extensões concretas: `Document`, `Text`, `Paragraph`, `Bold`, `Italic`.
+- [x] Criar `lib/src/tiptap/core/editor.dart` com plugins padrão (`history`, `keymap`, bold/italic), `getHTML`, `getJSON`, `setEditable` e `isActive` básico.
+- [x] Construir extensões concretas: `Document`, `Text`, `Paragraph`, `Bold`, `Italic`.
 - [x] Portar e validar o teste `test/tiptap/core/test_extension_manager.dart`.
 - [x] `dart analyze lib/src/tiptap/core test/tiptap` está limpo.
 - [x] `dart test test/tiptap/core/test_extension_manager.dart` passou.

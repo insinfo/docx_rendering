@@ -30,6 +30,9 @@ abstract class Selection {
   int get to => toRes.pos;
   ResolvedPos get fromRes => ranges[0].fromRes;
   ResolvedPos get toRes => ranges[0].toRes;
+  ResolvedPos get $from => fromRes;
+  ResolvedPos get $to => toRes;
+
 
   bool get empty {
     for (int i = 0; i < ranges.length; i++) {
@@ -152,8 +155,17 @@ Selection? findSelectionIn(PMNode doc, PMNode node, int pos, int index, int dir,
 class TextSelection extends Selection {
   TextSelection(ResolvedPos pos, [ResolvedPos? head]) : super(pos, head ?? pos);
 
+  ResolvedPos? get $cursor => anchorRes.pos == headRes.pos ? anchorRes : null;
+
+  @override
+  SelectionBookmark getBookmark() {
+    return TextBookmark(anchor, head);
+  }
+
+
   @override
   bool get visible => true;
+
 
   @override
   bool eq(Selection other) {
@@ -187,7 +199,6 @@ class TextSelection extends Selection {
     return TextSelection(anchorRes, headRes);
   }
 }
-
 class NodeSelection extends Selection {
   final PMNode node;
 
@@ -207,9 +218,15 @@ class NodeSelection extends Selection {
   }
 
   @override
+  SelectionBookmark getBookmark() {
+    return NodeBookmark(anchor);
+  }
+
+  @override
   Map<String, dynamic> toJSON() {
     return {"type": "node", "anchor": anchor};
   }
+
 
   static NodeSelection create(PMNode doc, int from) {
     return NodeSelection(doc.resolve(from));
@@ -247,4 +264,45 @@ void _ensureSelectionJsonRegistered() {
   Selection.jsonID("node", (doc, json) => NodeSelection.create(doc, json["anchor"] as int));
   Selection.jsonID("all", (doc, json) => AllSelection(doc));
   _selectionJsonRegistered = true;
+}
+
+class TextBookmark implements SelectionBookmark {
+  final int anchor;
+  final int head;
+
+  TextBookmark(this.anchor, this.head);
+
+  @override
+  SelectionBookmark map(Mapping mapping) {
+    return TextBookmark(mapping.map(anchor), mapping.map(head));
+  }
+
+  @override
+  Selection resolve(PMNode doc) {
+    return TextSelection.between(doc.resolve(anchor), doc.resolve(head));
+  }
+}
+
+class NodeBookmark implements SelectionBookmark {
+  final int anchor;
+
+  NodeBookmark(this.anchor);
+
+  @override
+  SelectionBookmark map(Mapping mapping) {
+    final mapped = mapping.mapResult(anchor, 1);
+    return mapped.deleted
+        ? TextBookmark(mapped.pos, mapped.pos)
+        : NodeBookmark(mapped.pos);
+  }
+
+  @override
+  Selection resolve(PMNode doc) {
+    final $pos = doc.resolve(anchor);
+    final node = $pos.nodeAfter;
+    if (node != null && NodeSelection.isSelectable(node)) {
+      return NodeSelection($pos);
+    }
+    return Selection.near($pos);
+  }
 }

@@ -1,4 +1,8 @@
 export 'src/prosemirror/model/index.dart';
 export 'src/prosemirror/state/index.dart';
-export 'src/prosemirror/transform/index.dart';
+export 'src/prosemirror/transform/index.dart' hide lift, setBlockType;
 export 'src/prosemirror/view/index.dart';
+export 'src/prosemirror/commands/index.dart';
+export 'src/prosemirror/keymap/keymap.dart';
+export 'src/prosemirror/history/history.dart';
+export 'src/prosemirror/inputrules/index.dart';
