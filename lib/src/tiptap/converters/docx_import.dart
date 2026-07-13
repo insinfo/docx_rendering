@@ -1,4 +1,4 @@
-import 'package:docx_rendering/docx_rendering.dart' hide Document;
+import 'package:docx_rendering/docx_rendering.dart';
 import 'package:docx_rendering/src/docx_rendering/document/dom.dart';
 import 'package:docx_rendering/src/docx_rendering/document/paragraph.dart';
 import 'package:docx_rendering/src/docx_rendering/document/run.dart';

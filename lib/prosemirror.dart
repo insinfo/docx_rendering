@@ -7,3 +7,4 @@ export 'src/prosemirror/keymap/keymap.dart';
 export 'src/prosemirror/history/history.dart';
 export 'src/prosemirror/inputrules/index.dart';
 export 'src/prosemirror/dropcursor/index.dart';
+export 'src/prosemirror/schema_list/index.dart';

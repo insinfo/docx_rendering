@@ -14,6 +14,24 @@ void main() {
       TextExtension(),
       BoldExtension(),
       ItalicExtension(),
+      UnderlineExtension(),
+      StrikeExtension(),
+      CodeExtension(),
+      LinkExtension(),
+      TextStyleExtension(),
+      HighlightExtension(),
+      HeadingExtension(),
+      BulletListExtension(),
+      OrderedListExtension(),
+      ListItemExtension(),
+      TextAlignExtension(),
+      ImageExtension(),
+      TableExtension(),
+      TableRowExtension(),
+      TableCellExtension(),
+      TableHeaderExtension(),
+      HardBreakExtension(),
+      HorizontalRuleExtension(),
       DropcursorExtension(),
     ],
   ));
@@ -23,4 +41,12 @@ void main() {
       'getTiptapJSON'.toJS, (() => editor.getJSON().toString()).toJS);
   window.setProperty('setTiptapEditable'.toJS,
       ((bool editable) => editor.setEditable(editable)).toJS);
+  window.setProperty('getTiptapDelta'.toJS, (() {
+    final converter = QuillDeltaConverter(editor.state.schema);
+    return converter.toDelta(editor.state.doc).toJson().toString();
+  }).toJS);
+  window.setProperty('toggleTiptapBulletList'.toJS,
+      (() => editor.chain.focus().toggleBulletList().run()).toJS);
+  window.setProperty('toggleTiptapHeading'.toJS,
+      ((int level) => editor.chain.focus().toggleHeading(level).run()).toJS);
 }

@@ -114,12 +114,12 @@ Hoje `paginate()` reprocessa o documento inteiro. Para edição:
 - [ ] Geração cooperativa: uma página por microtask (`await` a cada página) com callback de progresso — 200 páginas sem travar a UI.
 
 ### 5.3. Quill Delta (R3) — via core do `dart_quill`
-- [ ] Trazer `delta.dart`, `delta_iterator.dart`, `operation.dart` de `dart_quill/lib/src/dependencies/dart_quill_delta/core/` (não reimplementar — já tem `compose`/`transform`/`diff` maduros).
-- [ ] `lib/src/tiptap/converters/quill_delta.dart`:
+- [x] Trazer `delta.dart`, `delta_iterator.dart`, `operation.dart` de `dart_quill/lib/src/dependencies/dart_quill_delta/core/` (não reimplementar — já tem `compose`/`transform`/`diff` maduros). **Feito:** vendorizado em `lib/src/quill_delta/` (+ `diff_match_patch`), com `package:collection` substituído por `equality.dart` local para manter o runtime só com `package:web`. Exposto em `lib/quill_delta.dart`.
+- [x] `lib/src/tiptap/converters/quill_delta.dart` (`QuillDeltaConverter`):
   - **Delta→PM (documento inteiro):** um único passe com `DeltaIterator`; acumular runs de texto em buffers e construir cada parágrafo **uma vez** (nunca `Fragment.append` repetido — é O(n²)); atributo de bloco vem do `\n` que fecha a linha (convenção Quill). Resultado aplicado como **uma única transação** `replaceWith(0, doc.size, ...)`.
   - **Delta incremental (retain/insert/delete sobre documento existente):** manter um mapeamento posição-Quill→posição-PM durante o passe (posições Quill contam 1 por char e 1 por embed; PM conta tokens de abertura/fechamento de nó). Emitir os `ReplaceStep`s correspondentes em uma transação única — é isso que faz um delta de 50k ops ser aplicado sem reconstruir o documento.
   - **PM→Delta:** traversal linear com marcas → attrs inline e tipo de bloco → attrs no `\n`.
-- [ ] Testes de propriedade: `toDelta(fromDelta(d)) == d.normalize()` para deltas gerados aleatoriamente; benchmark com delta de 50k ops.
+- [x] Testes de propriedade: `toDelta(fromDelta(d)) == d` para deltas gerados aleatoriamente (50 seeds); benchmark com delta de 50k+ ops aplicado em uma transação < 1s na VM (`test/tiptap/converters/test_quill_delta.dart`). **Perdas documentadas:** tabelas e `hardBreak` não têm representação Quill; listas aninhadas achatam um nível; o caminho incremental cobre docs "flat" (parágrafos/headings) — split dentro de `listItem` cria parágrafo no mesmo item.
 
 ---
 
@@ -127,9 +127,9 @@ Hoje `paginate()` reprocessa o documento inteiro. Para edição:
 
 - [x] Concluir acoplamento inicial de `prosemirror-commands` + `keymap` + `history` no `EditorView`.
 - [x] `TiptapEditor`: `getHTML()`, `getJSON()`, `setEditable()`, `isActive(name, [attrs])` básico.
-- [ ] `TiptapEditor`: eventos (`onUpdate`, `onSelectionUpdate`, `onFocus`, `onBlur`) via `Stream`.
+- [x] `TiptapEditor`: eventos (`onUpdate`, `onSelectionUpdate`, `onFocus`, `onBlur`) via `Stream` (broadcast; `dispatchTransaction` centralizado funciona também headless).
 - [x] `CommandManager` real mínimo (chaining: `editor.chain.focus().toggleBold().run()`).
-- [ ] Extensões restantes para paridade com a demo do tiptap.dev: `Heading`, `Strike`, `Code`, `Link`, `TextColor`/`Highlight`, `BulletList`/`OrderedList`/`ListItem`, `TextAlign`, `Image`, `Table` (+ row/cell/header), `HardBreak`, `HorizontalRule`, `History`.
+- [x] Extensões restantes para paridade com a demo do tiptap.dev: `Heading`, `Strike`, `Code`, `Underline`, `Link`, `TextStyle` (color/font/size/background), `Highlight`, `BulletList`/`OrderedList`/`ListItem`, `TextAlign` (atributo em paragraph/heading + atalhos), `Image`, `Table` (+ row/cell/header com colspan/rowspan/colwidth), `HardBreak`, `HorizontalRule`, `History` (dedupe com o plugin default do editor). Comandos de lista portados do `prosemirror-schema-list` em `lib/src/prosemirror/schema_list/` (`wrapInList`, `splitListItem`, `liftListItem`, `sinkListItem`, com testes em `test/prosemirror/schema_list/`); `CommandManager` cobre todas (toggle de marcas, heading, listas, align, link/color, hardBreak/hr/image/insertTable). Keymap default: Mod-U/Mod-Shift-X/Mod-E, Enter/Tab/Shift-Tab em listas, Shift-Enter para hardBreak. Validado em Chrome (`test/tiptap/core/test_editor_browser.dart`).
 
 ---
 

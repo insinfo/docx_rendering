@@ -142,7 +142,7 @@ Selection? findSelectionIn(PMNode doc, PMNode node, int pos, int index, int dir,
   for (int i = index - (dir > 0 ? 0 : 1); dir > 0 ? i < node.childCount : i >= 0; i += dir) {
     PMNode child = node.child(i);
     if (!child.isAtom) {
-      Selection? inner = findSelectionIn(doc, child, pos + dir + (dir < 0 ? child.nodeSize : 0), dir < 0 ? child.childCount : 0, dir, textOnly);
+      Selection? inner = findSelectionIn(doc, child, pos + dir, dir < 0 ? child.childCount : 0, dir, textOnly);
       if (inner != null) return inner;
     } else if (!textOnly && NodeSelection.isSelectable(child)) {
       return NodeSelection.create(doc, pos - (dir < 0 ? child.nodeSize : 0));
