@@ -20,8 +20,9 @@
 ///   2. *Plan* — pure arithmetic over the captured numbers → page buckets.
 ///   3. *Build* — mutate the DOM once: create the page sections.
 ///
-/// Still deferred: splitting a single long *paragraph* across a page boundary
-/// (see `referencias/tiptap-pages/src/core.ts` `binarySearchTextBreak`).
+/// Long paragraphs are split at a measured line boundary by binary-searching
+/// character offsets with `Range.getBoundingClientRect`, then preserving the
+/// nested span structure with `Range.extractContents` during the build phase.
 library;
 
 import 'package:web/web.dart' as web;

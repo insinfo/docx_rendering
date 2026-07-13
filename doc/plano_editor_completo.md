@@ -22,7 +22,7 @@ Levantamento feito em jul/2026 sobre `C:\MyDartProjects`:
 - **Porte ProseMirror** (`lib/src/prosemirror/`): `model`, `transform`, `state`, `commands`, `history`, `keymap`, `inputrules`, `test_builder` e uma **view funcional inicial** em `lib/src/prosemirror/view/`. A view já monta `EditorView`, `ViewDesc`, `MutationObserver`, seleção DOM↔state, decorações, clipboard e handlers de input. `dart analyze` e `dart analyze lib/src/prosemirror/view/` estão limpos.
 - **Porte Tiptap** (`lib/src/tiptap/`): core inicial com `TiptapEditor`, `ExtensionManager`, `CommandManager` encadeável mínimo, extensões `Document/Text/Paragraph/Bold/Italic`, plugins padrão de `history`/`keymap` e demo web digitável.
 - **Renderizador DOCX→DOM** (`lib/src/docx_rendering/`): porte do docx-preview, com `renderAsync`. Carrega tudo em memória e renderiza de uma vez — sem lazy/streaming (ver §4.1).
-- **Paginação pós-render** (`lib/src/docx_rendering/renderer/pagination.dart`, 483 linhas): arquitetura Measure→Plan→Build (evita reflow), clona headers/footers, divide tabelas linha a linha. **Pendência conhecida:** não divide parágrafo longo único entre páginas (a solução está em `referencias/tiptap-pages/src/core.ts`, função `binarySearchTextBreak`).
+- **Paginação pós-render** (`lib/src/docx_rendering/renderer/pagination.dart`, 483 linhas): arquitetura Measure→Plan→Build (evita reflow), clona headers/footers, divide tabelas linha a linha e já divide parágrafos longos por busca binária com `Range.getBoundingClientRect`.
 - **Harness Puppeteer** (`test/docx_rendering/render_harness.dart`): compila a demo, serve, faz upload de cada DOCX de `resources/`, salva PNG+HTML — base pronta para benchmarks automatizados.
 - **Referências-fonte** em `referencias/`: todos os repositórios ProseMirror oficiais (inclusive `prosemirror-history`, `-commands`, `-keymap`, `-dropcursor`), o monorepo `tiptap-main`, e **quatro extensões de paginação do Tiptap** (`tiptap-pages`, `tiptap-extension-pagination`, `tiptap-pagination`, `tiptap-pagination-breaks`).
 
@@ -48,7 +48,7 @@ graph TD
     VIEW -->|Input/IME/Clipboard| TRANS[Transações]
     TRANS -->|State.apply| PM_DOC
 
-    PM_DOC -->|conversor direto §5.1| OUT_DOCX[docx_dart → .docx]
+    PM_DOC -->|conversor direto §5.1| OUT_DOCX[OOXML próprio → .docx]
     PM_DOC -->|conversor vetorial §5.2 + geometria da paginação| OUT_PDF[jsPDF → .pdf]
     PM_DOC <-->|DeltaConverter §5.3| QUILL[Quill Delta JSON]
 ```
@@ -92,7 +92,7 @@ O `WordDocument.load` atual é monolítico. Estratégia em três camadas, da mai
 ### 4.3. Paginação incremental
 Hoje `paginate()` reprocessa o documento inteiro. Para edição:
 - [ ] Transformar a paginação em plugin ProseMirror: a cada transação, usar `tr.mapping` para identificar o intervalo sujo e **repaginar apenas da página afetada para a frente, parando na primeira página cujo corte não mudou** (as extensões em `referencias/tiptap-extension-pagination` e `tiptap-pages` fazem exatamente isso — portar a lógica, não reinventar).
-- [ ] Resolver a pendência do parágrafo longo: portar `binarySearchTextBreak` de `referencias/tiptap-pages/src/core.ts` (busca binária com `Range.getBoundingClientRect` para achar o ponto de quebra dentro do parágrafo).
+- [x] Resolver a pendência do parágrafo longo: busca binária com `Range.getBoundingClientRect` em `_planParagraphSplit`/`_findSplitOffset`, preservando spans com `Range.extractContents` na fase Build.
 - [ ] Debounce: repaginar em `requestIdleCallback`/microtask após pausa de digitação (~150 ms), nunca sincronamente no keystroke.
 
 ---
@@ -108,11 +108,11 @@ Hoje `paginate()` reprocessa o documento inteiro. Para edição:
 ### 5.2. Exportação PDF (R4) — vetorial via porte `jsPDF`
 **Decisão: 100% vetorial, sem canvas/rasterização** (o plano anterior estava contraditório nesse ponto). Texto selecionável, arquivo pequeno, geração rápida.
 
-- [ ] Copiar o porte de `C:\MyDartProjects\jsPDF\` para dentro do projeto o que for necessario  — ele é auto-contido.
-- [ ] Criar `lib/src/tiptap/converters/pdf_export.dart`: traversal do `PMNode` emitindo `pdf.text()`, `pdf.rect()`/linhas para bordas de tabela, `pdf.addImage()` para imagens.
-- [ ] **Reusar a geometria da paginação**: a fase Plan já calculou onde cada bloco quebra de página e as larguras/altura de linha. O exportador consome esse plano em vez de recalcular word-wrap do zero — é isso que garante (a) PDF idêntico ao que se vê na tela e (b) velocidade. Para texto, `split_text_to_size.dart` do jsPDF só como fallback quando não houver plano (export sem render prévio).
-- [ ] Fontes: embutir/subsetar TTF via `ttffont.dart` (uma vez por documento, cache por família+peso); bold/italic mapeados para as variantes da família.
-- [ ] Geração cooperativa: uma página por microtask (`await` a cada página) com callback de progresso — 200 páginas sem travar a UI.
+- [x] Copiar o porte de `C:\MyDartProjects\jsPDF\` para dentro do projeto o que for necessário. **Feito:** fechamento de 36 arquivos vendorizado em `lib/src/jspdf/`; sem dependências externas e com backend condicional VM/JS/Wasm. Módulos alheios ao pipeline (HTML, annotations, outline etc.) ficaram de fora. O segundo inflater zlib do porte foi removido: PNG/PDF e ZIP/DOCX agora compartilham `docx_rendering/zip/codecs/zlib/zlib_codec.dart`, que acrescenta o envelope RFC 1950 ao Deflate/Inflate existente.
+- [x] Criar `lib/src/tiptap/converters/pdf_export.dart`: traversal do `PMNode` emitindo `pdf.text()`, `pdf.rect()`/linhas e `pdf.addImage()` PNG/JPEG. Inclui headings, marcas bold/italic/cor/fonte/tamanho, alinhamento, listas (inclusive `start`), `hardBreak`, tabelas, HR e imagens data-URI.
+- [x] **Reusar a geometria da paginação**: `capturePdfLayout()` materializa cooperativamente uma página virtualizada por vez e captura do DOM paginado as posições reais de linhas de texto, células, imagens e HR; o resultado é um `PdfLayoutPlan` consumido diretamente pelo exportador, sem recalcular word-wrap. Sem DOM/plano permanece disponível o fallback puro-Dart com métricas jsPDF.
+- [x] Fontes: TTFs fornecidas como `PdfFontAsset` são registradas uma vez por documento e subsetadas via `ttffont.dart`/Identity-H; família+peso/estilo são selecionados por run. As 14 fontes base usam WinAnsi/CP1252. Smoke com Roboto confirmou `/Type0`, `/ToUnicode`, `/Identity-H` e `/FontFile2`; a ordem extraída por `pdftotext` ficou correta após ajustar o fator das métricas vendorizadas.
+- [x] Geração cooperativa: layout cede o event loop por chunk e render cede uma vez por página, com callback de progresso. Benchmark em `test_pdf_export.dart`: ~200 páginas vetoriais em < 5 s (R4); no Chrome, 2,863 s. Inclui testes de PNG com alpha/SMask, xref, tabelas, listas e plano explícito; JS e Wasm compilam.
 
 ### 5.3. Quill Delta (R3) — via core do `dart_quill`
 - [x] Trazer `delta.dart`, `delta_iterator.dart`, `operation.dart` de `dart_quill/lib/src/dependencies/dart_quill_delta/core/` (não reimplementar — já tem `compose`/`transform`/`diff` maduros). **Feito:** vendorizado em `lib/src/quill_delta/` (+ `diff_match_patch`), com `package:collection` substituído por `equality.dart` local para manter o runtime só com `package:web`. Exposto em `lib/quill_delta.dart`.
