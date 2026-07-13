@@ -81,7 +81,9 @@ class DOMObserver {
     int from = view.state.doc.content.size;
     int to = 0;
     final added = <web.Node>[];
+    var selectionChanged = false;
     for (final record in records) {
+      if (record.type == 'selection') selectionChanged = true;
       final range = registerMutation(record, added);
       if (range != null) {
         if (range.from < from) from = range.from;
@@ -95,6 +97,16 @@ class DOMObserver {
         // Native editing can briefly produce DOM ranges that the still-partial
         // DOM change reader cannot reconcile. Keep the editor alive and let the
         // next observer flush resynchronize.
+      }
+    } else if (selectionChanged &&
+        !currentSelection.eq(view.domSelectionRange())) {
+      // Selection-only changes do not produce a MutationObserver record, but
+      // they still have to become a ProseMirror transaction before a toolbar
+      // command can operate on the native browser selection.
+      try {
+        handleDOMChange?.call(-1, -1, false, added);
+      } catch (_) {
+        // A transient DOM selection outside the editor is safe to ignore.
       }
     }
     setCurSelection();

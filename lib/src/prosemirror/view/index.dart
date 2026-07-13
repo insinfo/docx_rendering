@@ -258,6 +258,12 @@ class EditorView {
   DOMPosition domAtPos(int pos, [int side = 0]) =>
       docView.domFromPos(pos, side);
 
+  /// Returns the DOM node that represents the document node after [pos].
+  web.Node? nodeDOM(int pos) {
+    final desc = docView.descAt(pos);
+    return desc is NodeViewDesc ? desc.nodeDOM : null;
+  }
+
   domcoords.PosAtCoordsResult? posAtCoords(domcoords.ViewCoords coords) =>
       domcoords.posAtCoords(this, coords);
 

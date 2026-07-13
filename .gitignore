@@ -6,6 +6,8 @@ errors.txt
 # Generated web build artifacts (produced by `dart compile js` / build_runner)
 example/web/main.dart.js*
 web/main.dart.js*
+example2/build/
+example2/web/assets/
 
 # Render harness output (screenshots / HTML dumps)
 test/output/

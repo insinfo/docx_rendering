@@ -70,6 +70,50 @@ Command setMarkCommand(String markName, [Map<String, dynamic>? attrs]) {
   };
 }
 
+/// Mescla [attrs] à instância atual da marca em vez de apagar seus demais
+/// atributos. Em uma seleção, preserva cor/fonte/tamanho de cada run de texto.
+Command updateMarkAttrsCommand(String markName, Map<String, dynamic> attrs) {
+  return (state, [dispatch, view]) {
+    final markType = state.schema.marks[markName];
+    if (markType == null) return false;
+    final selection = state.selection;
+    if (dispatch == null) return true;
+    final tr = state.tr;
+
+    if (selection.empty) {
+      final cursor = selection is TextSelection ? selection.$cursor : null;
+      final marks = state.storedMarks ?? cursor?.marks() ?? const <Mark>[];
+      final existing = markType.isInSet(marks);
+      tr.addStoredMark(markType.create({
+        if (existing != null) ...existing.attrs,
+        ...attrs,
+      }));
+      dispatch(tr);
+      return true;
+    }
+
+    state.doc.nodesBetween(selection.from, selection.to,
+        (node, pos, parent, index) {
+      if (!node.isText) return true;
+      final from = pos < selection.from ? selection.from : pos;
+      final nodeEnd = pos + node.nodeSize;
+      final to = nodeEnd > selection.to ? selection.to : nodeEnd;
+      if (from >= to) return false;
+      final existing = markType.isInSet(node.marks);
+      tr.addMark(
+          from,
+          to,
+          markType.create({
+            if (existing != null) ...existing.attrs,
+            ...attrs,
+          }));
+      return false;
+    });
+    dispatch(tr);
+    return true;
+  };
+}
+
 /// Removes the given mark from the current selection.
 Command unsetMarkCommand(String markName) {
   return (state, [dispatch, view]) {

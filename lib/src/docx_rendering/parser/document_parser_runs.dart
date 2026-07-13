@@ -6,14 +6,14 @@ List<OpenXmlElement> _parseSdt(DocumentParser self, dynamic node,
   return sdtContent != null ? parser(sdtContent) : [];
 }
 
-OpenXmlElement _parseInserted(
-    DocumentParser self, dynamic node, OpenXmlElement Function(dynamic) parentParser) {
+OpenXmlElement _parseInserted(DocumentParser self, dynamic node,
+    OpenXmlElement Function(dynamic) parentParser) {
   final children = parentParser(node).children ?? [];
   return OpenXmlElementBase(type: DomType.inserted)..children = children;
 }
 
-OpenXmlElement _parseDeleted(
-    DocumentParser self, dynamic node, OpenXmlElement Function(dynamic) parentParser) {
+OpenXmlElement _parseDeleted(DocumentParser self, dynamic node,
+    OpenXmlElement Function(dynamic) parentParser) {
   final children = parentParser(node).children ?? [];
   return OpenXmlElementBase(type: DomType.deleted)..children = children;
 }
@@ -48,23 +48,28 @@ OpenXmlElement _parseParagraph(DocumentParser self, dynamic node) {
         result.children!.add(parseBookmarkEnd(el, globalXmlParser));
         break;
       case 'commentRangeStart':
-        result.children!.add(WmlCommentRangeStart(id: globalXmlParser.attr(el, 'id')));
+        result.children!
+            .add(WmlCommentRangeStart(id: globalXmlParser.attr(el, 'id')));
         break;
       case 'commentRangeEnd':
-        result.children!.add(WmlCommentRangeEnd(id: globalXmlParser.attr(el, 'id')));
+        result.children!
+            .add(WmlCommentRangeEnd(id: globalXmlParser.attr(el, 'id')));
         break;
       case 'oMath':
       case 'oMathPara':
         result.children!.add(self.parseMathElement(el));
         break;
       case 'sdt':
-        result.children!.addAll(self.parseSdt(el, (e) => self.parseParagraph(e).children ?? []));
+        result.children!.addAll(
+            self.parseSdt(el, (e) => self.parseParagraph(e).children ?? []));
         break;
       case 'ins':
-        result.children!.add(self.parseInserted(el, (e) => self.parseParagraph(e)));
+        result.children!
+            .add(self.parseInserted(el, (e) => self.parseParagraph(e)));
         break;
       case 'del':
-        result.children!.add(self.parseDeleted(el, (e) => self.parseParagraph(e)));
+        result.children!
+            .add(self.parseDeleted(el, (e) => self.parseParagraph(e)));
         break;
     }
   }
@@ -133,7 +138,17 @@ void _parseParagraphProperties(
   paragraph.cssStyle = {};
   paragraph.props ??= ParagraphProperties();
   self.parseDefaultProperties(elem, paragraph.cssStyle, null, (c) {
-    if (parseParagraphProperty(c, paragraph.props as ParagraphProperties, globalXmlParser)) {
+    // w:pPr/w:rPr defines the default character formatting for every run in
+    // this paragraph. It is inheritable CSS in docx-preview, so keep the full
+    // property set on the paragraph in addition to the typed subset.
+    if (globalXmlParser.localName(c) == 'rPr') {
+      parseParagraphProperty(
+          c, paragraph.props as ParagraphProperties, globalXmlParser);
+      self.parseDefaultProperties(c, paragraph.cssStyle);
+      return true;
+    }
+    if (parseParagraphProperty(
+        c, paragraph.props as ParagraphProperties, globalXmlParser)) {
       return true;
     }
 
@@ -146,9 +161,6 @@ void _parseParagraphProperties(
         break;
       case 'framePr':
         self.parseFrame(c, paragraph);
-        break;
-      case 'rPr':
-        // TODO ignore
         break;
       default:
         return false;
@@ -170,6 +182,8 @@ void _parseParagraphProperties(
   paragraph.pageBreakBefore = props.pageBreakBefore;
   paragraph.outlineLevel = props.outlineLevel;
   paragraph.runProps = props.runProps;
+  paragraph.fontSize = props.fontSize;
+  paragraph.color = props.color;
 }
 
 void _parseFrame(DocumentParser self, dynamic node, WmlParagraph paragraph) {
@@ -180,8 +194,8 @@ void _parseFrame(DocumentParser self, dynamic node, WmlParagraph paragraph) {
   }
 }
 
-WmlHyperlink _parseHyperlink(
-    DocumentParser self, dynamic node, [OpenXmlElement? parent]) {
+WmlHyperlink _parseHyperlink(DocumentParser self, dynamic node,
+    [OpenXmlElement? parent]) {
   final result = WmlHyperlink()
     ..parent = parent
     ..children = []
@@ -199,8 +213,8 @@ WmlHyperlink _parseHyperlink(
   return result;
 }
 
-WmlSmartTag _parseSmartTag(
-    DocumentParser self, dynamic node, [OpenXmlElement? parent]) {
+WmlSmartTag _parseSmartTag(DocumentParser self, dynamic node,
+    [OpenXmlElement? parent]) {
   final result = WmlSmartTag()
     ..parent = parent
     ..children = []
@@ -250,7 +264,8 @@ WmlRun _parseRun(DocumentParser self, dynamic node, [OpenXmlElement? parent]) {
         break;
       case 'instrText':
         result.fieldRun = true;
-        result.children!.add(WmlInstructionText(text: globalXmlParser.textContent(el) ?? ''));
+        result.children!.add(
+            WmlInstructionText(text: globalXmlParser.textContent(el) ?? ''));
         break;
       case 'fldSimple':
         result.children!.add(WmlFieldSimple(
@@ -274,10 +289,8 @@ WmlRun _parseRun(DocumentParser self, dynamic node, [OpenXmlElement? parent]) {
         result.children!.add(WmlText('\u00AD'));
         break;
       case 'sym':
-        result.children!.add(WmlSymbol(
-          globalXmlParser.attr(el, 'font') ?? '',
-          globalXmlParser.hexAttr(el, 'char') ?? 0
-        ));
+        result.children!.add(WmlSymbol(globalXmlParser.attr(el, 'font') ?? '',
+            globalXmlParser.hexAttr(el, 'char') ?? 0));
         break;
       case 'tab':
         result.children!.add(OpenXmlElementBase(type: DomType.tab));
@@ -294,13 +307,16 @@ WmlRun _parseRun(DocumentParser self, dynamic node, [OpenXmlElement? parent]) {
         if (r != null) result.children!.add(r);
         break;
       case 'footnoteReference':
-        result.children!.add(WmlNoteReference(globalXmlParser.attr(el, 'id') ?? '', DomType.footnoteReference));
+        result.children!.add(WmlNoteReference(
+            globalXmlParser.attr(el, 'id') ?? '', DomType.footnoteReference));
         break;
       case 'endnoteReference':
-        result.children!.add(WmlNoteReference(globalXmlParser.attr(el, 'id') ?? '', DomType.endnoteReference));
+        result.children!.add(WmlNoteReference(
+            globalXmlParser.attr(el, 'id') ?? '', DomType.endnoteReference));
         break;
       case 'commentReference':
-        result.children!.add(WmlCommentReference(id: globalXmlParser.attr(el, 'id')));
+        result.children!
+            .add(WmlCommentReference(id: globalXmlParser.attr(el, 'id')));
         break;
     }
   }
@@ -310,6 +326,9 @@ WmlRun _parseRun(DocumentParser self, dynamic node, [OpenXmlElement? parent]) {
 
 /// Parses run properties from <rPr> following the TS pattern.
 void _parseRunProperties(DocumentParser self, dynamic elem, WmlRun run) {
+  run.runProps = parseRunProperties(elem, globalXmlParser);
+  run.fontSize = run.runProps?.fontSize;
+  run.color = run.runProps?.color;
   run.cssStyle = self.parseDefaultProperties(elem, {}, null, (c) {
     switch (globalXmlParser.localName(c)) {
       case 'rStyle':

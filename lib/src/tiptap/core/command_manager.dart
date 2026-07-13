@@ -62,7 +62,18 @@ class CommandManager {
   }
 
   CommandManager setColor(String color) {
-    _commands.add(setMarkCommand('textStyle', {'color': color}));
+    _commands.add(updateMarkAttrsCommand('textStyle', {'color': color}));
+    return this;
+  }
+
+  CommandManager setFontFamily(String fontFamily) {
+    _commands
+        .add(updateMarkAttrsCommand('textStyle', {'fontFamily': fontFamily}));
+    return this;
+  }
+
+  CommandManager setFontSize(String fontSize) {
+    _commands.add(updateMarkAttrsCommand('textStyle', {'fontSize': fontSize}));
     return this;
   }
 
@@ -210,8 +221,9 @@ class CommandManager {
       }
       final rowNodes = <PMNode>[];
       for (var r = 0; r < rows; r++) {
-        final type =
-            withHeaderRow && r == 0 && headerType != null ? headerType : cellType;
+        final type = withHeaderRow && r == 0 && headerType != null
+            ? headerType
+            : cellType;
         final cells = [
           for (var c = 0; c < cols; c++)
             type.create(null, Fragment.from(paragraph.create()))

@@ -86,11 +86,7 @@ String pdfEscape(String text) {
 /// Converte uma [DateTime] para o formato de data PDF.
 /// Formato: D:YYYYMMDDHHmmSS+HH'mm'
 String convertDateToPDFDate(DateTime date) {
-  final tzoffset = date.timeZoneOffset.inMinutes;
-  final tzsign = tzoffset <= 0 ? '+' : '-';
-  final tzhour = (tzoffset.abs() ~/ 60);
-  final tzmin = tzoffset.abs() % 60;
-  final timeZoneString = "$tzsign${padd2(tzhour)}'${padd2(tzmin)}'";
+  final timeZoneString = formatPdfTimeZoneOffset(date.timeZoneOffset);
 
   return [
     'D:',
@@ -102,6 +98,19 @@ String convertDateToPDFDate(DateTime date) {
     padd2(date.second),
     timeZoneString,
   ].join('');
+}
+
+/// Formats a UTC offset using the PDF date suffix syntax (`+HH'mm'`).
+///
+/// Dart's [DateTime.timeZoneOffset] is local time minus UTC, so locations west
+/// of Greenwich have a negative offset. This is the same sign convention used
+/// by the PDF specification.
+String formatPdfTimeZoneOffset(Duration offset) {
+  final minutes = offset.inMinutes;
+  final sign = minutes < 0 ? '-' : '+';
+  final hour = minutes.abs() ~/ 60;
+  final minute = minutes.abs() % 60;
+  return "$sign${padd2(hour)}'${padd2(minute)}'";
 }
 
 /// Converte uma data PDF (string) de volta para [DateTime].

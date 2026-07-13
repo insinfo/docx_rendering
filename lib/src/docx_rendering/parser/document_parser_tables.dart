@@ -13,7 +13,8 @@ WmlTable _parseTable(DocumentParser self, dynamic node) {
         break;
       case 'tblPr':
         // Pass a cellStyle map so table-level borders land on every cell.
-        self.parseDefaultProperties(el, result.cssStyle = {}, result.cellStyle = {});
+        self.parseDefaultProperties(
+            el, result.cssStyle = {}, result.cellStyle = {});
         result.styleName = globalXmlParser.elementAttr(el, 'tblStyle', 'val');
         break;
     }
@@ -44,6 +45,18 @@ WmlTableRow _parseTableRow(DocumentParser self, dynamic node) {
       case 'trPr':
         self.parseDefaultProperties(el, result.cssStyle = {});
         result.isHeader = globalXmlParser.element(el, 'tblHeader') != null;
+        final rowHeight = globalXmlParser.element(el, 'trHeight');
+        if (rowHeight != null) {
+          result.height = globalXmlParser.lengthAttr(
+            rowHeight,
+            'val',
+            LengthUsage.dxa,
+          );
+          final rule = globalXmlParser.attr(rowHeight, 'hRule');
+          // ECMA-376 defines an omitted hRule as atLeast. Keeping the rule
+          // explicit lets the editor distinguish it from exact clipping.
+          result.heightRule = rule == 'exact' ? 'exact' : 'atLeast';
+        }
         break;
     }
   }
@@ -77,7 +90,7 @@ WmlTableCell _parseTableCell(DocumentParser self, dynamic node) {
 
         final tcW = globalXmlParser.element(el, 'tcW');
         if (tcW != null && !self.options.ignoreWidth) {
-          final w = globalXmlParser.lengthAttr(tcW, 'w', LengthUsage.dxa);
+          final w = _valueOfWidth(tcW);
           if (w != null) result.cssStyle!['width'] = w;
         }
         break;

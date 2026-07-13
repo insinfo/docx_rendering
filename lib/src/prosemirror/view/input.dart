@@ -5,6 +5,7 @@ import 'package:web/web.dart' as web;
 
 import '../model/index.dart';
 import 'capturekeys.dart';
+import 'clipboard.dart';
 import 'index.dart';
 import 'selection.dart';
 import 'viewdesc.dart';
@@ -114,7 +115,22 @@ final Map<String, DOMEventHandler> handlers = {
   },
   'copy': (view, event) => false,
   'cut': (view, event) => false,
-  'paste': (view, event) => doPaste(view, '', null, false, event),
+  'paste': (view, event) {
+    view.domObserver.forceFlush();
+    if (event is web.ClipboardEvent) {
+      final data = event.clipboardData;
+      if (data != null) {
+        return doPaste(
+          view,
+          data.getData('text/plain'),
+          data.getData('text/html'),
+          view.input.shiftKey,
+          event,
+        );
+      }
+    }
+    return capturePaste(view, event);
+  },
   'dragstart': (view, event) => false,
   'dragend': (view, event) {
     view.dragging = null;
@@ -212,14 +228,28 @@ bool dispatchEvent(EditorView view, dynamic event) {
 
 bool doPaste(EditorView view, String text, String? html, bool preferPlain,
     [web.Event? event]) {
+  final slice = parseFromClipboard(
+      view, text, html, preferPlain, view.state.selection.$from);
   final handled = view.someProp('handlePaste', (dynamic handler) {
-    return handler(view, event);
+    return handler(view, event, slice ?? Slice.empty);
   });
-  return handled == true;
+  if (handled == true) return true;
+  if (slice == null) return false;
+
+  final singleNode = slice.openStart == 0 &&
+          slice.openEnd == 0 &&
+          slice.content.childCount == 1
+      ? slice.content.firstChild
+      : null;
+  final tr = singleNode != null
+      ? view.state.tr.replaceSelectionWith(singleNode, preferPlain)
+      : view.state.tr.replaceSelection(slice);
+  view.dispatch(
+      tr.scrollIntoView().setMeta('paste', true).setMeta('uiEvent', 'paste'));
+  return true;
 }
 
-bool capturePaste(EditorView view, web.Event event) =>
-    doPaste(view, '', null, false, event);
+bool capturePaste(EditorView view, web.Event event) => false;
 
 bool get brokenClipboardAPI => false;
 

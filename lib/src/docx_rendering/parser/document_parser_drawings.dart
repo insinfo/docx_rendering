@@ -22,28 +22,43 @@ OpenXmlElement? _parseDrawingWrapper(DocumentParser self, dynamic node) {
 /// Parses an inline or anchor drawing wrapper, creating a Drawing container
 /// element with CSS positioning/wrapping.
 OpenXmlElement? _parseDrawingInlineOrAnchor(DocumentParser self, dynamic node) {
-  final result = OpenXmlElementBase(type: DomType.drawing)
-    ..cssStyle = {};
+  final result = OpenXmlElementBase(type: DomType.drawing)..cssStyle = {};
   final isAnchor = globalXmlParser.localName(node) == 'anchor';
 
   String? wrapType;
+  String? frameWidth;
+  String? frameHeight;
+  IDomImage? picture;
   final simplePos = globalXmlParser.boolAttr(node, 'simplePos') ?? false;
 
-  final posX = <String, String>{'relative': 'page', 'align': 'left', 'offset': '0'};
-  final posY = <String, String>{'relative': 'page', 'align': 'top', 'offset': '0'};
+  final posX = <String, String>{
+    'relative': 'page',
+    'align': 'left',
+    'offset': '0'
+  };
+  final posY = <String, String>{
+    'relative': 'page',
+    'align': 'top',
+    'offset': '0'
+  };
 
   for (final n in globalXmlParser.elements(node)) {
     switch (globalXmlParser.localName(n)) {
       case 'simplePos':
         if (simplePos) {
-          posX['offset'] = globalXmlParser.lengthAttr(n, 'x', LengthUsage.emu) ?? '0';
-          posY['offset'] = globalXmlParser.lengthAttr(n, 'y', LengthUsage.emu) ?? '0';
+          posX['offset'] =
+              globalXmlParser.lengthAttr(n, 'x', LengthUsage.emu) ?? '0';
+          posY['offset'] =
+              globalXmlParser.lengthAttr(n, 'y', LengthUsage.emu) ?? '0';
         }
         break;
 
       case 'extent':
-        result.cssStyle!['width'] = globalXmlParser.lengthAttr(n, 'cx', LengthUsage.emu) ?? '';
-        result.cssStyle!['height'] = globalXmlParser.lengthAttr(n, 'cy', LengthUsage.emu) ?? '';
+        frameWidth = globalXmlParser.lengthAttr(n, 'cx', LengthUsage.emu) ?? '';
+        frameHeight =
+            globalXmlParser.lengthAttr(n, 'cy', LengthUsage.emu) ?? '';
+        result.cssStyle!['width'] = frameWidth;
+        result.cssStyle!['height'] = frameHeight;
         break;
 
       case 'positionH':
@@ -57,11 +72,14 @@ OpenXmlElement? _parseDrawingInlineOrAnchor(DocumentParser self, dynamic node) {
           if (relFrom != null) pos['relative'] = relFrom;
 
           if (alignNode != null) {
-            pos['align'] = globalXmlParser.textContent(alignNode) ?? pos['align']!;
+            pos['align'] =
+                globalXmlParser.textContent(alignNode) ?? pos['align']!;
           }
 
           if (offsetNode != null) {
-            pos['offset'] = convertLength(globalXmlParser.textContent(offsetNode), LengthUsage.emu) ?? '0';
+            pos['offset'] = convertLength(
+                    globalXmlParser.textContent(offsetNode), LengthUsage.emu) ??
+                '0';
           }
         }
         break;
@@ -76,8 +94,24 @@ OpenXmlElement? _parseDrawingInlineOrAnchor(DocumentParser self, dynamic node) {
 
       case 'graphic':
         final g = _parseGraphic(self, n);
-        if (g != null) result.children!.add(g);
+        if (g != null) {
+          result.children!.add(g);
+          if (g is IDomImage) picture = g;
+        }
         break;
+    }
+  }
+
+  // wp:extent is the size Word uses for layout. pic:spPr/a:xfrm may carry
+  // the bitmap's pre-crop or historical transform size and is frequently a
+  // few percent different. The old parser exposed that inner size to the
+  // importer, making header logos visibly wider than Word.
+  if (picture != null) {
+    if (frameWidth != null && frameWidth.isNotEmpty) {
+      picture.cssStyle!['width'] = frameWidth;
+    }
+    if (frameHeight != null && frameHeight.isNotEmpty) {
+      picture.cssStyle!['height'] = frameHeight;
     }
   }
 
@@ -100,7 +134,8 @@ OpenXmlElement? _parseDrawingInlineOrAnchor(DocumentParser self, dynamic node) {
     if (posY['offset'] != null && posY['offset'] != '0') {
       result.cssStyle!['top'] = posY['offset']!;
     }
-  } else if (isAnchor && (posX['align'] == 'left' || posX['align'] == 'right')) {
+  } else if (isAnchor &&
+      (posX['align'] == 'left' || posX['align'] == 'right')) {
     result.cssStyle!['float'] = posX['align']!;
   }
 
@@ -125,8 +160,10 @@ OpenXmlElement? _parseGraphic(DocumentParser self, dynamic elem) {
 /// Parses a <pic:pic> element into an IDomImage.
 IDomImage? _parsePicture(DocumentParser self, dynamic elem) {
   final blipFill = globalXmlParser.element(elem, 'blipFill');
-  final blip = blipFill != null ? globalXmlParser.element(blipFill, 'blip') : null;
-  final srcRect = blipFill != null ? globalXmlParser.element(blipFill, 'srcRect') : null;
+  final blip =
+      blipFill != null ? globalXmlParser.element(blipFill, 'blip') : null;
+  final srcRect =
+      blipFill != null ? globalXmlParser.element(blipFill, 'srcRect') : null;
 
   final result = IDomImage(
     blip != null ? (globalXmlParser.attr(blip, 'embed') ?? '') : '',
@@ -150,12 +187,16 @@ IDomImage? _parsePicture(DocumentParser self, dynamic elem) {
     for (final n in globalXmlParser.elements(xfrm)) {
       switch (globalXmlParser.localName(n)) {
         case 'ext':
-          result.cssStyle!['width'] = globalXmlParser.lengthAttr(n, 'cx', LengthUsage.emu) ?? '';
-          result.cssStyle!['height'] = globalXmlParser.lengthAttr(n, 'cy', LengthUsage.emu) ?? '';
+          result.cssStyle!['width'] =
+              globalXmlParser.lengthAttr(n, 'cx', LengthUsage.emu) ?? '';
+          result.cssStyle!['height'] =
+              globalXmlParser.lengthAttr(n, 'cy', LengthUsage.emu) ?? '';
           break;
         case 'off':
-          result.cssStyle!['left'] = globalXmlParser.lengthAttr(n, 'x', LengthUsage.emu) ?? '';
-          result.cssStyle!['top'] = globalXmlParser.lengthAttr(n, 'y', LengthUsage.emu) ?? '';
+          result.cssStyle!['left'] =
+              globalXmlParser.lengthAttr(n, 'x', LengthUsage.emu) ?? '';
+          result.cssStyle!['top'] =
+              globalXmlParser.lengthAttr(n, 'y', LengthUsage.emu) ?? '';
           break;
       }
     }
@@ -190,4 +231,3 @@ OpenXmlElement _parseVmlPicture(DocumentParser self, dynamic elem) {
 
   return result;
 }
-

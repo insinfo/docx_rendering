@@ -61,11 +61,10 @@ class TiptapEditor {
   TiptapEditor(EditorOptions options) {
     extensionManager = ExtensionManager(options.extensions);
     final schema = extensionManager.createSchema();
-    final hasHistoryExtension = options.extensions
-        .any((e) => e is Extension && e.name == 'history');
+    final hasHistoryExtension =
+        options.extensions.any((e) => e is Extension && e.name == 'history');
     _plugins = _defaultPlugins(
-        schema,
-        [...extensionManager.createPlugins(), ...options.plugins],
+        schema, [...extensionManager.createPlugins(), ...options.plugins],
         includeHistory: !hasHistoryExtension);
     state = EditorState.create(EditorStateConfig(
       schema: schema,
@@ -82,12 +81,6 @@ class TiptapEditor {
   CommandManager get chain => CommandManager(this);
 
   String getHTML() {
-    final currentView = view;
-    if (currentView != null) {
-      return (currentView.dom as JSObject)
-          .getProperty<JSString>('innerHTML'.toJS)
-          .toDart;
-    }
     final wrap = web.document.createElement('div') as web.HTMLElement;
     DOMSerializer.fromSchema(state.schema)
         .serializeFragment(state.doc.content, target: wrap);
@@ -95,6 +88,24 @@ class TiptapEditor {
   }
 
   dynamic getJSON() => state.doc.toJSON();
+
+  /// Replaces the complete document, including attributes on the top-level
+  /// node, in a single transaction.
+  ///
+  /// Replacing only `doc.content` silently loses section geometry and opaque
+  /// DOCX header/footer payloads. This method is the canonical path for whole
+  /// document imports such as DOCX and Quill Delta.
+  void setDocument(PMNode document) {
+    if (document.type != state.doc.type) {
+      throw ArgumentError('Document must use the editor top node type.');
+    }
+    final tr = state.tr;
+    for (final name in state.doc.type.attrs.keys) {
+      tr.setDocAttribute(name, document.attrs[name]);
+    }
+    tr.replaceWith(0, state.doc.content.size, document.content);
+    dispatchTransaction(tr);
+  }
 
   void setEditable(bool editable) {
     if (_editable == editable) return;
@@ -115,6 +126,15 @@ class TiptapEditor {
 
     final nodeType = state.schema.nodes[name];
     if (nodeType != null) {
+      if (state.selection.empty) {
+        final $from = state.selection.$from;
+        for (var depth = $from.depth; depth >= 0; depth--) {
+          final node = $from.node(depth);
+          if (node.type == nodeType && _attrsMatch(node.attrs, attrs)) {
+            return true;
+          }
+        }
+      }
       var active = false;
       state.doc.nodesBetween(selectionFrom, selectionTo,
           (node, pos, parent, index) {
@@ -129,7 +149,8 @@ class TiptapEditor {
     return false;
   }
 
-  bool _attrsMatch(Map<String, dynamic> nodeAttrs, Map<String, dynamic>? attrs) {
+  bool _attrsMatch(
+      Map<String, dynamic> nodeAttrs, Map<String, dynamic>? attrs) {
     if (attrs == null) return true;
     for (final entry in attrs.entries) {
       if (nodeAttrs[entry.key] != entry.value) return false;
@@ -164,7 +185,6 @@ class TiptapEditor {
   DirectEditorProps _viewProps() {
     return DirectEditorProps(
       state: state,
-      plugins: _plugins,
       editable: (_) => _editable,
       dispatchTransaction: dispatchTransaction,
     );

@@ -1,0 +1,392 @@
+/*
+ * Portable editor chrome for package:docx_rendering.
+ *
+ * Dart Web / webdev:
+ *   <link rel="stylesheet"
+ *         href="packages/docx_rendering/assets/tiptap_editor.css">
+ *
+ * Keep this stylesheet global in AngularDart because ProseMirror creates its
+ * editable descendants at runtime. Every rule is scoped by `.tiptap-ui`, so
+ * multiple instances can coexist without styling the rest of the application.
+ */
+.tiptap-ui {
+  --tiptap-ink: #17171b;
+  --tiptap-muted: #707078;
+  --tiptap-line: #e5e5e8;
+  --tiptap-surface: #fff;
+  --tiptap-canvas: #f3f3f2;
+  --tiptap-accent: #6d5dfc;
+  --tiptap-accent-soft: #eeebff;
+  color: var(--tiptap-ink);
+  font-family: Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+
+.tiptap-ui *,
+.tiptap-ui *::before,
+.tiptap-ui *::after { box-sizing: border-box; }
+
+.tiptap-ui .tiptap-icon {
+  display: block;
+  pointer-events: none;
+}
+
+.tiptap-ui .toolbar {
+  min-height: 44px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--tiptap-line);
+  background: color-mix(in srgb, var(--tiptap-surface) 94%, transparent);
+}
+
+.tiptap-ui .tool-group { display: flex; align-items: center; gap: 1px; }
+.tiptap-ui .tool-divider {
+  width: 1px;
+  height: 24px;
+  margin: 0 5px;
+  flex: 0 0 auto;
+  background: var(--tiptap-line);
+}
+
+.tiptap-ui .tool-button,
+.tiptap-ui .zoom-value,
+.tiptap-ui .color-button {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  place-items: center;
+}
+
+.tiptap-ui .tool-button:hover,
+.tiptap-ui .zoom-value:hover,
+.tiptap-ui .color-button:hover,
+.tiptap-ui .select-tool select:hover { background: #f0f0f2; }
+
+.tiptap-ui .tool-button.active {
+  color: var(--tiptap-accent);
+  background: var(--tiptap-accent-soft);
+}
+
+.tiptap-ui .select-tool { position: relative; flex: 0 0 auto; }
+.tiptap-ui .select-tool::after {
+  content: "⌄";
+  position: absolute;
+  right: 7px;
+  top: 7px;
+  color: var(--tiptap-muted);
+  pointer-events: none;
+}
+.tiptap-ui .select-tool select {
+  height: 34px;
+  padding: 0 25px 0 9px;
+  border: 0;
+  border-radius: 7px;
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  outline: 0;
+}
+
+.tiptap-ui .document-viewport {
+  position: relative;
+  min-height: 600px;
+  padding: 32px 30px 70px;
+  overflow: auto;
+  background: var(--tiptap-canvas);
+}
+.tiptap-ui .page-scale { width: fit-content; margin: 0 auto; }
+.tiptap-ui .page-sheet {
+  --tiptap-page-height: 1123px;
+  --tiptap-page-gap: 32px;
+  position: relative;
+  width: 794px;
+  min-height: 1123px;
+  padding: 0;
+  background: transparent;
+  filter: drop-shadow(0 12px 18px rgba(30, 28, 25, .10));
+}
+
+.tiptap-ui .ProseMirror {
+  min-height: var(--tiptap-page-height, 1123px);
+  outline: none;
+  background: var(--tiptap-surface);
+  color: var(--tiptap-ink);
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.tiptap-ui .ProseMirror > :first-child { margin-top: 0; }
+.tiptap-ui .ProseMirror p { margin: 0 0 .88em; }
+.tiptap-ui .ProseMirror h1 { margin: 1.5em 0 .65em; font-size: 26px; line-height: 1.18; }
+.tiptap-ui .ProseMirror h2 { margin: 1.35em 0 .55em; font-size: 21px; line-height: 1.22; }
+.tiptap-ui .ProseMirror h3 { margin: 1.2em 0 .45em; font-size: 18px; }
+.tiptap-ui .ProseMirror ul,
+.tiptap-ui .ProseMirror ol { margin: .4em 0 1em; padding-left: 1.8em; }
+.tiptap-ui .ProseMirror li[data-docx-numbering-label]::marker {
+  content: attr(data-docx-numbering-label) "\00a0";
+}
+.tiptap-ui .ProseMirror a { color: #315bd6; text-decoration: underline; }
+.tiptap-ui .ProseMirror code { padding: 2px 5px; border-radius: 4px; background: #f0eff4; }
+.tiptap-ui .ProseMirror img { display: block; max-width: 100%; height: auto; margin: 1em auto; }
+.tiptap-ui .ProseMirror table { width: 100%; margin: 1.2em 0; border-collapse: collapse; table-layout: fixed; }
+.tiptap-ui .ProseMirror th,
+.tiptap-ui .ProseMirror td { min-width: 70px; padding: 7px 9px; border: 1px solid #cfcfd4; }
+.tiptap-ui .ProseMirror th > p,
+.tiptap-ui .ProseMirror td > p { margin-bottom: 0; }
+.tiptap-ui .ProseMirror th { background: #f4f4f5; }
+.tiptap-ui .ProseMirror table[data-docx-textbox] {
+  margin: 0;
+  overflow: hidden;
+}
+.tiptap-ui .ProseMirror table[data-docx-textbox] td {
+  min-width: 0;
+  padding: 3.6pt 7.2pt;
+  overflow: hidden;
+  vertical-align: top;
+}
+.tiptap-ui .ProseMirror table[data-docx-textbox] p {
+  margin: 0 !important;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.tiptap-ui .tiptap-pagination,
+.tiptap-ui .tiptap-page-break {
+  height: 0;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.tiptap-ui .tiptap-page-spacer,
+.tiptap-ui .breaker {
+  box-sizing: border-box;
+}
+.tiptap-ui .tiptap-page-header,
+.tiptap-ui .tiptap-page-footer,
+.tiptap-ui .tiptap-pagination-gap {
+  box-sizing: border-box;
+  width: 100%;
+}
+.tiptap-ui .tiptap-page-header,
+.tiptap-ui .tiptap-page-footer {
+  pointer-events: auto;
+}
+.tiptap-ui .tiptap-page-region-active {
+  z-index: 12;
+  cursor: text;
+  outline: none;
+}
+.tiptap-ui .tiptap-page-editor-overlay {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px dashed color-mix(in srgb, var(--tiptap-accent) 74%, transparent);
+  pointer-events: none;
+  color: var(--tiptap-accent);
+}
+.tiptap-ui .tiptap-page-editor-overlay.is-header { bottom: 0; }
+.tiptap-ui .tiptap-page-editor-overlay.is-footer { top: 0; }
+.tiptap-ui .tiptap-page-editor-label {
+  position: absolute;
+  left: 10px;
+  top: -25px;
+  padding: 3px 8px;
+  border-radius: 5px 5px 0 0;
+  color: #fff;
+  background: var(--tiptap-accent);
+  font: 650 11px/18px Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: .01em;
+  user-select: none;
+}
+.tiptap-ui .tiptap-page-editor-overlay.is-footer .tiptap-page-editor-label {
+  top: 3px;
+  border-radius: 0 0 5px 5px;
+}
+.tiptap-ui .tiptap-page-object-toolbar {
+  position: absolute;
+  right: 10px;
+  top: -34px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--tiptap-line);
+  border-radius: 8px;
+  background: var(--tiptap-surface);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .14);
+  pointer-events: auto;
+}
+.tiptap-ui .tiptap-page-editor-overlay.is-footer .tiptap-page-object-toolbar {
+  top: 7px;
+}
+.tiptap-ui .tiptap-page-object-action {
+  width: 27px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--tiptap-ink);
+  background: transparent;
+  cursor: pointer;
+}
+.tiptap-ui .tiptap-page-object-action:hover {
+  color: var(--tiptap-accent);
+  background: var(--tiptap-accent-soft);
+}
+.tiptap-ui .tiptap-page-object-action[aria-pressed="true"] {
+  color: var(--tiptap-accent);
+  background: var(--tiptap-accent-soft);
+}
+.tiptap-ui .tiptap-page-object-action[aria-disabled="true"] {
+  color: var(--tiptap-muted);
+  cursor: default;
+  opacity: .45;
+}
+.tiptap-ui .tiptap-page-object-selected { outline: none; }
+.tiptap-ui .tiptap-page-object-selection {
+  position: absolute;
+  z-index: 50;
+  border: 1.5px solid var(--tiptap-accent);
+  pointer-events: none;
+}
+.tiptap-ui .tiptap-object-handle,
+.tiptap-ui .tiptap-object-move-handle {
+  position: absolute;
+  z-index: 2;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--tiptap-accent);
+  border-radius: 50%;
+  background: #fff;
+  pointer-events: auto;
+  touch-action: none;
+}
+.tiptap-ui .tiptap-object-handle.handle-nw { left: -5px; top: -5px; cursor: nwse-resize; }
+.tiptap-ui .tiptap-object-handle.handle-n { left: 50%; top: -5px; transform: translateX(-50%); cursor: ns-resize; }
+.tiptap-ui .tiptap-object-handle.handle-ne { right: -5px; top: -5px; cursor: nesw-resize; }
+.tiptap-ui .tiptap-object-handle.handle-e { right: -5px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.tiptap-ui .tiptap-object-handle.handle-se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.tiptap-ui .tiptap-object-handle.handle-s { left: 50%; bottom: -5px; transform: translateX(-50%); cursor: ns-resize; }
+.tiptap-ui .tiptap-object-handle.handle-sw { left: -5px; bottom: -5px; cursor: nesw-resize; }
+.tiptap-ui .tiptap-object-handle.handle-w { left: -5px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.tiptap-ui .tiptap-object-move-handle {
+  left: 50%;
+  top: -25px;
+  width: 21px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  transform: translateX(-50%);
+  border-radius: 5px;
+  color: #fff;
+  background: var(--tiptap-accent);
+  font: 12px/1 sans-serif;
+  cursor: move;
+}
+.tiptap-ui .tiptap-docx-page-field {
+  display: inline;
+  user-select: none;
+}
+.tiptap-ui .tiptap-vertical-ruler {
+  position: absolute;
+  z-index: 8;
+  top: 8px;
+  left: 8px;
+  width: 22px;
+  height: 0;
+  min-height: 0;
+  overflow: visible;
+  margin: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.tiptap-ui .tiptap-vertical-ruler::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: min(760px, calc(100vh - 220px));
+  min-height: 520px;
+  border: 1px solid color-mix(in srgb, var(--tiptap-line) 84%, #888);
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 8px, #a6a6ac 8px 9px, transparent 9px 19px),
+    color-mix(in srgb, var(--tiptap-surface) 93%, transparent);
+  box-shadow: 0 2px 9px rgba(0, 0, 0, .08);
+}
+.tiptap-ui .tiptap-ruler-number {
+  position: absolute;
+  left: 2px;
+  color: var(--tiptap-muted);
+  font: 8px/1 Arial, sans-serif;
+}
+.tiptap-ui .tiptap-pagination-gap {
+  border-top: 1px solid var(--tiptap-line);
+  border-bottom: 1px solid var(--tiptap-line);
+}
+.tiptap-ui .ProseMirror[data-tiptap-pages="true"] > table {
+  display: contents;
+  width: 100%;
+}
+.tiptap-ui .ProseMirror[data-tiptap-pages="true"] > table > tbody {
+  display: contents;
+  width: 100%;
+}
+.tiptap-ui .ProseMirror[data-tiptap-pages="true"] > table > tbody > tr {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+.tiptap-ui .ProseMirror[data-tiptap-pages="true"] > table > tbody > tr > th,
+.tiptap-ui .ProseMirror[data-tiptap-pages="true"] > table > tbody > tr > td {
+  /* Word's tblGrid may legitimately contain tracks narrower than the 70 px
+     convenience minimum used by newly inserted editor tables. A grid item
+     wider than its track overlaps the following cell instead of widening the
+     explicit track, so imported paginated tables must honor the OOXML grid. */
+  min-width: 0;
+  width: auto !important;
+  box-sizing: border-box;
+  position: relative;
+  /* Word's default cell margins are 0 vertically and roughly 5.4pt on the
+     sides. The editor's generic 7px padding plus .88em paragraph gap made
+     every imported row about 18pt too tall and displaced whole sections by
+     dozens of pages. Explicit DOCX paragraph spacing still wins inline. */
+  padding: 0 7.2px;
+}
+.tiptap-ui .ProseMirror[data-tiptap-pages="true"] > table > tbody > tr[data-height-rule="exact"] > th,
+.tiptap-ui .ProseMirror[data-tiptap-pages="true"] > table > tbody > tr[data-height-rule="exact"] > td {
+  overflow: hidden;
+}
+
+.tiptap-ui.tiptap-dark {
+  --tiptap-ink: #eeeeef;
+  --tiptap-muted: #a2a2aa;
+  --tiptap-line: #34343a;
+  --tiptap-surface: #252529;
+  --tiptap-canvas: #18181b;
+  --tiptap-accent-soft: rgba(109, 93, 252, .2);
+}
+
+@media (max-width: 720px) {
+  .tiptap-ui .document-viewport { padding-inline: 18px; }
+  .tiptap-ui .tiptap-vertical-ruler { display: none; }
+}

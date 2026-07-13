@@ -34,6 +34,20 @@ class PdfPageFormat {
   });
 }
 
+/// Resolves the physical PDF page and margins preserved by [DocxImporter].
+/// DOCX lengths are stored as CSS-compatible values (normally `pt`).
+PdfPageFormat pdfPageFormatForDocument(model.PMNode doc) {
+  final attrs = doc.attrs;
+  return PdfPageFormat(
+    width: _lengthInPoints(attrs['pageWidth']) ?? 595.28,
+    height: _lengthInPoints(attrs['pageHeight']) ?? 841.89,
+    marginTop: _lengthInPoints(attrs['pageMarginTop']) ?? 72,
+    marginRight: _lengthInPoints(attrs['pageMarginRight']) ?? 72,
+    marginBottom: _lengthInPoints(attrs['pageMarginBottom']) ?? 72,
+    marginLeft: _lengthInPoints(attrs['pageMarginLeft']) ?? 72,
+  );
+}
+
 /// Geometria pronta, normalmente capturada durante a paginação da UI.
 class PdfLayoutPlan {
   final List<PdfLayoutPage> pages;
@@ -58,13 +72,15 @@ class PdfTextItem extends PdfLayoutItem {
   final bool italic;
   final String? color;
   final String? fontFamily;
+  final double letterSpacing;
 
   const PdfTextItem(this.text, this.x, this.y,
       {this.fontSize = 11,
       this.bold = false,
       this.italic = false,
       this.color,
-      this.fontFamily});
+      this.fontFamily,
+      this.letterSpacing = 0});
 }
 
 class PdfImageItem extends PdfLayoutItem {
@@ -87,8 +103,10 @@ class PdfLineItem extends PdfLayoutItem {
 class PdfRectItem extends PdfLayoutItem {
   final double x, y, width, height;
   final double strokeWidth;
+  final String? strokeColor;
+  final String? fillColor;
   const PdfRectItem(this.x, this.y, this.width, this.height,
-      {this.strokeWidth = .5});
+      {this.strokeWidth = .5, this.strokeColor, this.fillColor});
 }
 
 /// Uma variante TTF registrada uma vez no documento e subsetada pelo jsPDF.
@@ -172,6 +190,7 @@ class PdfExporter {
           pdf
             ..setFont(family, fontStyle: resolvedStyle)
             ..setFontSize(item.fontSize)
+            ..setCharSpace(item.letterSpacing)
             ..setTextColor(item.color ?? '#000000')
             ..text(custom ? item.text : _winAnsi(item.text), item.x, item.y);
         case PdfLineItem():
@@ -179,9 +198,16 @@ class PdfExporter {
             ..setLineWidth(item.width)
             ..line(item.x1, item.y1, item.x2, item.y2);
         case PdfRectItem():
-          pdf
-            ..setLineWidth(item.strokeWidth)
-            ..rect(item.x, item.y, item.width, item.height);
+          pdf.setLineWidth(item.strokeWidth);
+          if (item.strokeColor != null) pdf.setDrawColor(item.strokeColor!);
+          if (item.fillColor != null) pdf.setFillColor(item.fillColor!);
+          pdf.rect(
+            item.x,
+            item.y,
+            item.width,
+            item.height,
+            item.fillColor == null ? 'S' : 'FD',
+          );
         case PdfImageItem():
           if (item.format != null) {
             pdf.addImage(item.data, item.format!, item.x, item.y, item.width,
@@ -456,6 +482,23 @@ double? _dimension(dynamic value) {
       RegExp(r'[0-9]+(?:\.[0-9]+)?').firstMatch(value)?.group(0) ?? '');
   if (number == null) return null;
   return value.trim().endsWith('pt') ? number : number * .75;
+}
+
+double? _lengthInPoints(dynamic value) {
+  if (value is num) return value.toDouble();
+  if (value is! String) return null;
+  final match = RegExp(r'^\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(pt|px|in|cm|mm)?\s*$',
+          caseSensitive: false)
+      .firstMatch(value);
+  if (match == null) return null;
+  final number = double.parse(match.group(1)!);
+  return switch (match.group(2)?.toLowerCase()) {
+    'px' => number * .75,
+    'in' => number * 72,
+    'cm' => number * 72 / 2.54,
+    'mm' => number * 72 / 25.4,
+    _ => number,
+  };
 }
 
 String _baseFontFamily(String? requested) {

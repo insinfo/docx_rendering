@@ -9,6 +9,7 @@ class WmlSettings {
   NoteProperties? footnoteProps;
   NoteProperties? endnoteProps;
   bool? autoHyphenation;
+  bool? evenAndOddHeaders;
 }
 
 /// Properties for notes (footnotes/endnotes).
@@ -37,6 +38,10 @@ WmlSettings parseSettings(dynamic elem, XmlParser xml) {
         break;
       case 'autoHyphenation':
         result.autoHyphenation = xml.boolAttr(el, 'val');
+        break;
+      case 'evenAndOddHeaders':
+        // An empty on/off element means true in WordprocessingML.
+        result.evenAndOddHeaders = xml.boolAttr(el, 'val') ?? true;
         break;
     }
   }

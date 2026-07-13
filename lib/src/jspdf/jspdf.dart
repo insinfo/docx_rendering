@@ -152,6 +152,7 @@ class JsPdf {
   List<List<num>> _dashPattern = [];
   double _lineHeightFactor = 1.15;
   double _charSpace = 0;
+  bool _charSpaceDirty = false;
 
   final Map<String, GState> _gStates = {};
   final Map<String, String> _gStatesMap = {};
@@ -885,8 +886,11 @@ class JsPdf {
 
     _doc.out('/${_activeFontKey} ${f2(fontSize)} Tf');
 
-    if (_charSpace != 0) {
+    // Character spacing is a text-state parameter and survives BT/ET. A zero
+    // must therefore be emitted once when resetting a previously tracked run.
+    if (_charSpace != 0 || _charSpaceDirty) {
       _doc.out('${_hpf(_charSpace)} Tc');
+      _charSpaceDirty = false;
     }
 
     for (var i = 0; i < lines.length; i++) {
@@ -1549,6 +1553,13 @@ class JsPdf {
   double get charSpace => _charSpace;
   String get textColor => _textColor;
   double get lineHeightFactor => _lineHeightFactor;
+
+  /// Sets PDF `Tc` character spacing in the document's current unit.
+  JsPdf setCharSpace(double value) {
+    if (_charSpace != value) _charSpaceDirty = true;
+    _charSpace = value;
+    return this;
+  }
 
   /// Emite operadores PDF brutos na página atual.
   ///

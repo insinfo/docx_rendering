@@ -20,3 +20,4 @@ export 'table.dart';
 export 'hard_break.dart';
 export 'horizontal_rule.dart';
 export 'history.dart';
+export 'pagination.dart';

@@ -4,6 +4,7 @@ import '../../prosemirror/model/index.dart';
 import '../../prosemirror/model/from_dom.dart';
 
 import '../core/extension.dart';
+import 'block_style.dart';
 
 class HeadingExtension extends NodeExtension {
   final List<int> levels;
@@ -17,27 +18,23 @@ class HeadingExtension extends NodeExtension {
         group: 'block',
         defining: true,
         attrs: {
+          ...blockStyleAttributeSpecs(),
           'level': AttributeSpec(defaultValue: 1, hasDefault: true),
-          'textAlign': AttributeSpec(defaultValue: null, hasDefault: true),
         },
         parseDOM: [
           for (final level in levels)
             TagParseRule(
               tag: 'h$level',
               getAttrs: (web.HTMLElement dom) => {
+                ...blockStyleAttrsFromDom(dom),
                 'level': level,
-                'textAlign':
-                    dom.style.textAlign.isEmpty ? null : dom.style.textAlign,
               },
             ),
         ],
         toDOM: (node) {
           final tag = 'h${node.attrs['level']}';
-          final align = node.attrs['textAlign'];
-          if (align != null) {
-            return [tag, {'style': 'text-align: $align'}, 0];
-          }
-          return [tag, 0];
+          final attrs = blockStyleDomAttrs(node);
+          return attrs.isEmpty ? [tag, 0] : [tag, attrs, 0];
         },
       );
 }

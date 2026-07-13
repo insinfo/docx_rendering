@@ -400,11 +400,12 @@ class NodeContext {
   bool inlineContext(web.Node node) {
     if (type != null) return type!.inlineContent;
     if (content.isNotEmpty) return content[0].isInline;
-    if (node.parentNode != null) {
-      String name = (node.parentNode! as web.Element).tagName.toLowerCase();
-      return !blockTags.containsKey(name);
-    }
-    return true;
+    // A parser can receive a DocumentFragment (clipboard/template content),
+    // so a text node's parent isn't necessarily an Element. `nodeName` is
+    // available on every DOM Node and mirrors upstream prosemirror-model.
+    final parent = node.parentNode;
+    return parent != null &&
+        !blockTags.containsKey(parent.nodeName.toLowerCase());
   }
 }
 
@@ -467,7 +468,14 @@ class ParseContext {
               topContext.content.isNotEmpty ? topContext.content.last : null;
           web.Node? domNodeBefore = dom.previousSibling;
           if (nodeBefore == null ||
-              (domNodeBefore is web.Element && domNodeBefore.tagName == 'BR') ||
+              // package:web DOM interfaces are JS interop types. An `is
+              // web.Element` check isn't a reliable node-kind check after
+              // dart2js, and may accept clipboard Comment nodes (such as
+              // `<!--StartFragment-->`). Reading `tagName` from those nodes
+              // yields JS `undefined`, which fails the non-nullable String
+              // check. `nodeName` is defined for every DOM Node and is also
+              // what upstream prosemirror-model uses here.
+              domNodeBefore?.nodeName == 'BR' ||
               (nodeBefore.isText &&
                   RegExp(r'[ \t\r\n\u000c]$').hasMatch(nodeBefore.text!))) {
             value = value.substring(1);
@@ -851,7 +859,9 @@ void _normalizeList(web.Node dom) {
   web.Node? child = dom.firstChild;
   while (child != null) {
     web.Node? next = child.nextSibling;
-    String? name = child is web.Element ? child.tagName.toLowerCase() : null;
+    String? name = child.nodeType == 1
+        ? (child as web.Element).tagName.toLowerCase()
+        : null;
     if (name != null && listTags.containsKey(name) && prevItem != null) {
       prevItem.appendChild(child);
     } else if (name == "li") {

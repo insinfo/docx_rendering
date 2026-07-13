@@ -108,16 +108,14 @@ class WmlHyperlink extends OpenXmlElement {
   String? id;
   String? anchor;
 
-  WmlHyperlink({this.id, this.anchor})
-      : super(type: DomType.hyperlink);
+  WmlHyperlink({this.id, this.anchor}) : super(type: DomType.hyperlink);
 }
 
 /// Alt chunk element.
 class WmlAltChunk extends OpenXmlElement {
   String? id;
 
-  WmlAltChunk({this.id})
-      : super(type: DomType.altChunk);
+  WmlAltChunk({this.id}) : super(type: DomType.altChunk);
 }
 
 /// Smart tag element.
@@ -125,16 +123,14 @@ class WmlSmartTag extends OpenXmlElement {
   String? uri;
   String? element;
 
-  WmlSmartTag({this.uri, this.element})
-      : super(type: DomType.smartTag);
+  WmlSmartTag({this.uri, this.element}) : super(type: DomType.smartTag);
 }
 
 /// Note reference element (footnote or endnote).
 class WmlNoteReference extends OpenXmlElement {
   String id;
 
-  WmlNoteReference(this.id, DomType type)
-      : super(type: type);
+  WmlNoteReference(this.id, DomType type) : super(type: type);
 }
 
 /// Break element (page, lastRenderedPageBreak, textWrapping).
@@ -150,8 +146,7 @@ class WmlBreak extends OpenXmlElement {
 class WmlText extends OpenXmlElement {
   String text;
 
-  WmlText(this.text)
-      : super(type: DomType.text);
+  WmlText(this.text) : super(type: DomType.text);
 }
 
 /// Symbol element.
@@ -159,8 +154,7 @@ class WmlSymbol extends OpenXmlElement {
   String font;
   int char;
 
-  WmlSymbol(this.font, this.char)
-      : super(type: DomType.symbol);
+  WmlSymbol(this.font, this.char) : super(type: DomType.symbol);
 }
 
 /// Table element with column definitions and cell styles.
@@ -170,8 +164,7 @@ class WmlTable extends OpenXmlElement {
   int? colBandSize;
   int? rowBandSize;
 
-  WmlTable()
-      : super(type: DomType.table, children: []);
+  WmlTable() : super(type: DomType.table, children: []);
 }
 
 /// Table row element.
@@ -180,8 +173,13 @@ class WmlTableRow extends OpenXmlElement {
   int? gridBefore;
   int? gridAfter;
 
-  WmlTableRow()
-      : super(type: DomType.row, children: []);
+  /// Minimum/exact row height declared by `w:trHeight`, as a CSS length.
+  String? height;
+
+  /// Word row-height rule (`atLeast` by default, or `exact`).
+  String? heightRule;
+
+  WmlTableRow() : super(type: DomType.row, children: []);
 }
 
 /// Table cell element.
@@ -189,8 +187,7 @@ class WmlTableCell extends OpenXmlElement {
   String? verticalMerge; // 'restart' | 'continue'
   int? span;
 
-  WmlTableCell()
-      : super(type: DomType.cell, children: []);
+  WmlTableCell() : super(type: DomType.cell, children: []);
 }
 
 /// Image element.

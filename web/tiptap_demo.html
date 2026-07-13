@@ -1,55 +1,146 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tiptap Dart Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Tiptap Dart — DOCX Editor</title>
   <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="tiptap_demo.css">
   <script defer src="tiptap_demo.dart.js"></script>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: Arial, sans-serif;
-      background: #f5f7fb;
-      color: #1f2937;
-    }
-
-    main {
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 32px 20px;
-    }
-
-    h1 {
-      font-size: 24px;
-      margin: 0 0 16px;
-    }
-
-    #editor {
-      min-height: 220px;
-      background: #fff;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      padding: 18px;
-      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
-    }
-
-    .ProseMirror {
-      min-height: 180px;
-      outline: none;
-      white-space: pre-wrap;
-    }
-
-    .ProseMirror p {
-      margin: 0 0 12px;
-    }
-  </style>
 </head>
 <body>
-  <main>
-    <h1>Tiptap Dart Demo</h1>
-    <div id="editor"></div>
-  </main>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand" href="#" aria-label="Tiptap Dart">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Tiptap <strong>Dart</strong></span>
+      </a>
+
+      <div class="document-identity">
+        <input id="document-title" value="Documento sem título" aria-label="Nome do documento">
+        <span id="save-state" class="save-state"><span class="status-dot"></span>Salvo localmente</span>
+      </div>
+
+      <div class="header-actions">
+        <button class="header-button" id="open-docx-button" title="Abrir DOCX">
+          <span class="button-icon" data-tiptap-icon="open"></span><span>Abrir</span>
+        </button>
+        <button class="header-button" id="open-delta-button" title="Importar Quill Delta JSON">
+          <span class="button-icon" data-tiptap-icon="code"></span><span>Delta</span>
+        </button>
+        <div class="export-menu">
+          <button class="header-button primary" id="export-menu-button" aria-expanded="false">
+            <span class="button-icon" data-tiptap-icon="download"></span><span>Exportar</span><span class="chevron">⌄</span>
+          </button>
+          <div class="menu-panel" id="export-menu" role="menu">
+            <button id="export-docx" role="menuitem"><span class="file-badge docx">W</span><span><strong>Documento DOCX</strong><small>Editável no Word</small></span></button>
+            <button id="export-pdf" role="menuitem"><span class="file-badge pdf">P</span><span><strong>Documento PDF</strong><small>Texto vetorial selecionável</small></span></button>
+            <button id="copy-delta" role="menuitem"><span class="file-badge json">{ }</span><span><strong>Copiar Quill Delta</strong><small>JSON para integração</small></span></button>
+          </div>
+        </div>
+        <button class="icon-button header-icon" id="theme-toggle" title="Alternar tema" aria-label="Alternar tema"><span data-tiptap-icon="sun"></span></button>
+      </div>
+    </header>
+
+    <nav class="mode-tabs" aria-label="Modelos de editor">
+      <button disabled>Agent editor</button>
+      <button class="active">Docx editor</button>
+      <button disabled>Notion-like editor</button>
+      <button disabled>Simple editor</button>
+    </nav>
+
+    <main class="editor-frame tiptap-ui" id="editor-frame">
+      <div class="progress-strip" id="progress-strip" aria-hidden="true"><span></span></div>
+
+      <div class="toolbar" id="toolbar" role="toolbar" aria-label="Formatação do documento">
+        <div class="tool-group zoom-group">
+          <button class="tool-button compact" data-tiptap-action="zoom-out" title="Diminuir zoom" aria-label="Diminuir zoom"><span data-tiptap-icon="minus"></span></button>
+          <button class="zoom-value" id="zoom-value" data-tiptap-zoom-value title="Zoom atual">100%</button>
+          <button class="tool-button compact" data-tiptap-action="zoom-in" title="Aumentar zoom" aria-label="Aumentar zoom"><span data-tiptap-icon="plus"></span></button>
+        </div>
+        <span class="tool-divider"></span>
+
+        <label class="select-tool block-style">
+          <select id="block-style" data-tiptap-control="block-style" aria-label="Estilo do bloco">
+            <option value="paragraph">Texto normal</option>
+            <option value="heading-1">Título 1</option>
+            <option value="heading-2">Título 2</option>
+            <option value="heading-3">Título 3</option>
+          </select>
+        </label>
+        <label class="select-tool font-family">
+          <select id="font-family" data-tiptap-control="font-family" aria-label="Fonte">
+            <option value="Arial">Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Inter">Inter</option>
+          </select>
+        </label>
+        <label class="select-tool font-size">
+          <select id="font-size" data-tiptap-control="font-size" aria-label="Tamanho da fonte">
+            <option>10</option><option>11</option><option selected>12</option>
+            <option>14</option><option>16</option><option>18</option>
+            <option>24</option><option>32</option><option>48</option>
+          </select>
+        </label>
+        <span class="tool-divider"></span>
+
+        <div class="tool-group">
+          <button class="tool-button text-tool" data-tiptap-command="bold" title="Negrito (Ctrl+B)" aria-label="Negrito"><span data-tiptap-icon="bold"></span></button>
+          <button class="tool-button text-tool" data-tiptap-command="italic" title="Itálico (Ctrl+I)" aria-label="Itálico"><span data-tiptap-icon="italic"></span></button>
+          <button class="tool-button text-tool" data-tiptap-command="underline" title="Sublinhado (Ctrl+U)" aria-label="Sublinhado"><span data-tiptap-icon="underline"></span></button>
+          <button class="tool-button text-tool" data-tiptap-command="strike" title="Tachado" aria-label="Tachado"><span data-tiptap-icon="strike"></span></button>
+          <button class="tool-button text-tool code" data-tiptap-command="code" title="Código" aria-label="Código"><span data-tiptap-icon="code"></span></button>
+        </div>
+
+        <div class="tool-group color-tools">
+          <label class="color-button" title="Cor do texto"><span>A</span><input id="text-color" data-tiptap-control="text-color" type="color" value="#2563eb"><i id="text-color-line" data-tiptap-color-indicator="text-color"></i></label>
+          <label class="color-button highlight-button" title="Marca-texto"><span>◆</span><input id="highlight-color" data-tiptap-control="highlight-color" type="color" value="#fef08a"><i id="highlight-color-line" data-tiptap-color-indicator="highlight-color"></i></label>
+        </div>
+
+        <button class="tool-button" data-tiptap-action="link" title="Adicionar link" aria-label="Adicionar link"><span data-tiptap-icon="link"></span></button>
+        <button class="tool-button" id="insert-image-button" data-tiptap-preserve-selection title="Inserir imagem" aria-label="Inserir imagem"><span data-tiptap-icon="image"></span></button>
+        <span class="tool-divider"></span>
+
+        <div class="tool-group">
+          <button class="tool-button" data-tiptap-command="bulletList" title="Lista com marcadores" aria-label="Lista com marcadores"><span data-tiptap-icon="list-bullet"></span></button>
+          <button class="tool-button" data-tiptap-command="orderedList" title="Lista numerada" aria-label="Lista numerada"><span data-tiptap-icon="list-number"></span></button>
+          <button class="tool-button" data-tiptap-command="align-left" title="Alinhar à esquerda" aria-label="Alinhar à esquerda"><span data-tiptap-icon="align-left"></span></button>
+          <button class="tool-button" data-tiptap-command="align-center" title="Centralizar" aria-label="Centralizar"><span data-tiptap-icon="align-center"></span></button>
+          <button class="tool-button" data-tiptap-command="align-right" title="Alinhar à direita" aria-label="Alinhar à direita"><span data-tiptap-icon="align-right"></span></button>
+        </div>
+        <span class="tool-divider"></span>
+
+        <div class="tool-group">
+          <button class="tool-button" data-tiptap-action="table" title="Inserir tabela" aria-label="Inserir tabela"><span data-tiptap-icon="table"></span></button>
+          <button class="tool-button" data-tiptap-action="horizontal-rule" title="Linha horizontal" aria-label="Linha horizontal"><span data-tiptap-icon="horizontal-rule"></span></button>
+          <button class="tool-button" data-tiptap-action="undo" title="Desfazer (Ctrl+Z)" aria-label="Desfazer"><span data-tiptap-icon="undo"></span></button>
+          <button class="tool-button" data-tiptap-action="redo" title="Refazer (Ctrl+Y)" aria-label="Refazer"><span data-tiptap-icon="redo"></span></button>
+        </div>
+      </div>
+
+      <section class="document-viewport" id="document-viewport">
+        <div class="page-scale" id="page-scale">
+          <article class="page-sheet" id="page-sheet">
+            <div id="editor" aria-label="Conteúdo do documento"></div>
+          </article>
+        </div>
+      </section>
+
+      <footer class="status-bar">
+        <div><span id="word-count">0 palavras</span><span class="status-separator">·</span><span id="character-count">0 caracteres</span></div>
+        <div><span id="document-status">Pronto</span><span class="status-separator">·</span><span>Português (Brasil)</span></div>
+      </footer>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <input id="open-docx-input" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+  <input id="open-delta-input" type="file" accept=".json,application/json" hidden>
+  <input id="insert-image-input" type="file" accept="image/png,image/jpeg" hidden>
 </body>
 </html>

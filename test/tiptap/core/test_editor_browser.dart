@@ -154,6 +154,32 @@ void main() {
     editor.destroy();
   });
 
+  test('textStyle mescla fonte e tamanho sem apagar a cor', () {
+    final editor = buildEditor();
+    final schema = editor.state.schema;
+    final colored = schema.mark('textStyle', {'color': '#ff0000'});
+    final doc = schema.node('doc', null, [
+      schema.node('paragraph', null, [
+        schema.text('texto', [colored])
+      ])
+    ]);
+    final tr = editor.state.tr;
+    tr.replaceWith(0, editor.state.doc.content.size, doc.content);
+    tr.setSelection(TextSelection.create(tr.doc, 1, 6));
+    editor.dispatchTransaction(tr);
+
+    editor.chain.setFontFamily('Arial').setFontSize('18px').run();
+    final mark = editor.state.doc
+        .child(0)
+        .child(0)
+        .marks
+        .firstWhere((mark) => mark.type.name == 'textStyle');
+    expect(mark.attrs['color'], '#ff0000');
+    expect(mark.attrs['fontFamily'], 'Arial');
+    expect(mark.attrs['fontSize'], '18px');
+    editor.destroy();
+  });
+
   test('round-trip Delta com o schema real do editor', () {
     final editor = buildEditor();
     final converter = QuillDeltaConverter(editor.state.schema);
@@ -167,6 +193,38 @@ void main() {
       ..insert('\n', {'list': 'bullet'});
     final doc = converter.fromDelta(delta);
     expect(converter.toDelta(doc), delta);
+    editor.destroy();
+  });
+
+  test('setDocument preserva atributos do documento na mesma transação',
+      () async {
+    final editor = buildEditor();
+    final schema = editor.state.schema;
+    final imported = schema.node('doc', {
+      'pageWidth': '595.30pt',
+      'headers': {
+        'default': [
+          {
+            'type': 'paragraph',
+            'content': [
+              {'type': 'text', 'text': 'cabeçalho'},
+            ],
+          },
+        ],
+      },
+    }, [
+      schema.node('paragraph', null, [schema.text('corpo importado')]),
+    ]);
+
+    final updates = <Transaction>[];
+    editor.onUpdate.listen(updates.add);
+    editor.setDocument(imported);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(editor.state.doc.textContent, 'corpo importado');
+    expect(editor.state.doc.attrs['pageWidth'], '595.30pt');
+    expect(editor.state.doc.attrs['headers'], imported.attrs['headers']);
+    expect(updates, hasLength(1));
     editor.destroy();
   });
 }

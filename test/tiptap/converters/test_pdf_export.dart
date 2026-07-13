@@ -85,7 +85,9 @@ void main() {
     ]);
     const plan = PdfLayoutPlan([
       PdfLayoutPage([
-        PdfTextItem('planejado', 12, 34, fontSize: 9, color: '#ff0000'),
+        PdfTextItem('planejado', 12, 34,
+            fontSize: 9, color: '#ff0000', letterSpacing: -.1),
+        PdfTextItem('sem tracking', 12, 46, fontSize: 9),
         PdfLineItem(10, 50, 80, 50),
         PdfRectItem(10, 60, 70, 20),
       ])
@@ -94,6 +96,9 @@ void main() {
         latin1.decode(await const PdfExporter().export(doc, layout: plan));
 
     expect(pdf, contains('(planejado) Tj'));
+    expect(pdf, matches(RegExp(r'-0\.1(?:0+)? Tc')));
+    expect(pdf, matches(RegExp(r'\n0(?:\.0*)? Tc')),
+        reason: 'o tracking precisa ser zerado no próximo run');
     expect(pdf, contains('1. 0. 0. rg'));
     expect(pdf, matches(RegExp(r'70\.\s+-20\.\s+re S')));
     expect(pdf, isNot(contains('(ignorado) Tj')));

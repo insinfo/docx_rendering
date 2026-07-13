@@ -1,7 +1,7 @@
 part of '../document_parser.dart';
 
-List<T> _parseNotes<T extends WmlBaseNote>(
-    DocumentParser self, dynamic xmlDoc, String elemName, T Function() factory) {
+List<T> _parseNotes<T extends WmlBaseNote>(DocumentParser self, dynamic xmlDoc,
+    String elemName, T Function() factory) {
   final result = <T>[];
 
   for (final el in globalXmlParser.elements(xmlDoc, elemName)) {
@@ -34,24 +34,31 @@ List<WmlComment> _parseComments(DocumentParser self, dynamic xmlDoc) {
 DocumentElement _parseDocumentFile(DocumentParser self, dynamic xmlDoc) {
   final xbody = globalXmlParser.element(xmlDoc, 'body');
   final background = globalXmlParser.element(xmlDoc, 'background');
-  final sectPr = xbody != null ? globalXmlParser.element(xbody, 'sectPr') : null;
+  final sectPr =
+      xbody != null ? globalXmlParser.element(xbody, 'sectPr') : null;
 
   return DocumentElement()
     ..type = DomType.document
     ..children = xbody != null ? self.parseBodyElements(xbody) : []
-    ..sectionProps = sectPr != null ? parseSectionProperties(sectPr, globalXmlParser) : SectionProperties()
+    ..sectionProps = sectPr != null
+        ? parseSectionProperties(sectPr, globalXmlParser)
+        : SectionProperties()
     ..cssStyle = background != null ? self.parseBackground(background) : {};
 }
 
-Future<DocumentElement> _parseDocumentFileAsync(DocumentParser self, dynamic xmlDoc) async {
+Future<DocumentElement> _parseDocumentFileAsync(
+    DocumentParser self, dynamic xmlDoc) async {
   final xbody = globalXmlParser.element(xmlDoc, 'body');
   final background = globalXmlParser.element(xmlDoc, 'background');
-  final sectPr = xbody != null ? globalXmlParser.element(xbody, 'sectPr') : null;
+  final sectPr =
+      xbody != null ? globalXmlParser.element(xbody, 'sectPr') : null;
 
   return DocumentElement()
     ..type = DomType.document
     ..children = xbody != null ? await _parseBodyElementsAsync(self, xbody) : []
-    ..sectionProps = sectPr != null ? parseSectionProperties(sectPr, globalXmlParser) : SectionProperties()
+    ..sectionProps = sectPr != null
+        ? parseSectionProperties(sectPr, globalXmlParser)
+        : SectionProperties()
     ..cssStyle = background != null ? self.parseBackground(background) : {};
 }
 
@@ -89,7 +96,8 @@ List<OpenXmlElement> _parseBodyElements(DocumentParser self, dynamic element) {
   return children;
 }
 
-Future<List<OpenXmlElement>> _parseBodyElementsAsync(DocumentParser self, dynamic element) async {
+Future<List<OpenXmlElement>> _parseBodyElementsAsync(
+    DocumentParser self, dynamic element) async {
   final children = <OpenXmlElement>[];
   final chunkSize = self.options.chunkSize < 1 ? 50 : self.options.chunkSize;
   int count = 0;
@@ -155,20 +163,50 @@ Map<String, String> _parseDefaultProperties(
       case 'highlight':
         final highlight = globalXmlParser.colorAttr(c, 'val');
         if (highlight != null) {
-          style['background-color'] = highlight == 'auto' ? 'transparent' : highlight;
+          style['background-color'] =
+              highlight == 'auto' ? 'transparent' : highlight;
         }
         break;
       case 'tcW':
+      case 'tblW':
         if (self.options.ignoreWidth) break;
-        final w = globalXmlParser.lengthAttr(c, 'w', LengthUsage.dxa);
+        final w = _valueOfWidth(c);
         if (w != null) style['width'] = w;
+        break;
+      case 'tblCellMar':
+      case 'tcMar':
+        final target = childStyle ?? style;
+        for (final margin in globalXmlParser.elements(c)) {
+          final value = _valueOfWidth(margin);
+          if (value == null) continue;
+          switch (globalXmlParser.localName(margin)) {
+            case 'top':
+              target['padding-top'] = value;
+              break;
+            case 'start':
+            case 'left':
+              target['padding-left'] = value;
+              break;
+            case 'bottom':
+              target['padding-bottom'] = value;
+              break;
+            case 'end':
+            case 'right':
+              target['padding-right'] = value;
+              break;
+          }
+        }
         break;
       case 'ind':
       case 'tblInd':
-        final start = globalXmlParser.lengthAttr(c, 'start', LengthUsage.dxa) ?? globalXmlParser.lengthAttr(c, 'left', LengthUsage.dxa);
-        final end = globalXmlParser.lengthAttr(c, 'end', LengthUsage.dxa) ?? globalXmlParser.lengthAttr(c, 'right', LengthUsage.dxa);
-        final firstLine = globalXmlParser.lengthAttr(c, 'firstLine', LengthUsage.dxa);
-        final hanging = globalXmlParser.lengthAttr(c, 'hanging', LengthUsage.dxa);
+        final start = globalXmlParser.lengthAttr(c, 'start', LengthUsage.dxa) ??
+            globalXmlParser.lengthAttr(c, 'left', LengthUsage.dxa);
+        final end = globalXmlParser.lengthAttr(c, 'end', LengthUsage.dxa) ??
+            globalXmlParser.lengthAttr(c, 'right', LengthUsage.dxa);
+        final firstLine =
+            globalXmlParser.lengthAttr(c, 'firstLine', LengthUsage.dxa);
+        final hanging =
+            globalXmlParser.lengthAttr(c, 'hanging', LengthUsage.dxa);
 
         if (start != null) style['margin-left'] = start;
         if (end != null) style['margin-right'] = end;
@@ -210,25 +248,43 @@ Map<String, String> _parseDefaultProperties(
         }
         break;
       case 'b':
-        style['font-weight'] = globalXmlParser.boolAttr(c, 'val', true) == true ? 'bold' : 'normal';
+        style['font-weight'] = globalXmlParser.boolAttr(c, 'val', true) == true
+            ? 'bold'
+            : 'normal';
         break;
       case 'i':
-        style['font-style'] = globalXmlParser.boolAttr(c, 'val', true) == true ? 'italic' : 'normal';
+        style['font-style'] = globalXmlParser.boolAttr(c, 'val', true) == true
+            ? 'italic'
+            : 'normal';
         break;
       case 'caps':
-        style['text-transform'] = globalXmlParser.boolAttr(c, 'val', true) == true ? 'uppercase' : 'none';
+        style['text-transform'] =
+            globalXmlParser.boolAttr(c, 'val', true) == true
+                ? 'uppercase'
+                : 'none';
         break;
       case 'smallCaps':
-        style['font-variant'] = globalXmlParser.boolAttr(c, 'val', true) == true ? 'small-caps' : 'none';
+        style['font-variant'] = globalXmlParser.boolAttr(c, 'val', true) == true
+            ? 'small-caps'
+            : 'none';
         break;
       case 'strike':
-        style['text-decoration'] = globalXmlParser.boolAttr(c, 'val', true) == true ? 'line-through' : 'none';
+        style['text-decoration'] =
+            globalXmlParser.boolAttr(c, 'val', true) == true
+                ? 'line-through'
+                : 'none';
         break;
       case 'dstrike':
-        style['text-decoration'] = globalXmlParser.boolAttr(c, 'val', true) == true ? 'line-through' : 'none'; // dstrike is double strike, mapped to single
+        style['text-decoration'] =
+            globalXmlParser.boolAttr(c, 'val', true) == true
+                ? 'line-through'
+                : 'none'; // dstrike is double strike, mapped to single
         break;
       case 'u':
-        style['text-decoration'] = globalXmlParser.boolAttr(c, 'val', true) == true ? 'underline' : 'none';
+        style['text-decoration'] =
+            globalXmlParser.boolAttr(c, 'val', true) == true
+                ? 'underline'
+                : 'none';
         break;
       case 'vertAlign':
         final va = globalXmlParser.attr(c, 'val');
@@ -240,7 +296,8 @@ Map<String, String> _parseDefaultProperties(
       case 'spacing':
         final p = globalXmlParser.parent(c);
         if (p != null && globalXmlParser.localName(p) == 'pPr') {
-          final before = globalXmlParser.lengthAttr(c, 'before', LengthUsage.dxa);
+          final before =
+              globalXmlParser.lengthAttr(c, 'before', LengthUsage.dxa);
           final after = globalXmlParser.lengthAttr(c, 'after', LengthUsage.dxa);
           final line = globalXmlParser.attr(c, 'line');
           final lineRule = globalXmlParser.attr(c, 'lineRule');
@@ -250,7 +307,9 @@ Map<String, String> _parseDefaultProperties(
 
           if (line != null) {
             if (lineRule == 'atLeast' || lineRule == 'exact') {
-              style['line-height'] = globalXmlParser.lengthAttr(c, 'line', LengthUsage.dxa) ?? 'normal';
+              style['line-height'] =
+                  globalXmlParser.lengthAttr(c, 'line', LengthUsage.dxa) ??
+                      'normal';
             } else if (lineRule == 'auto') {
               final val = double.tryParse(line) ?? 0.0;
               // CSS unitless line-height (= N × font-size). NB: Word's "auto" is
@@ -279,7 +338,11 @@ void _parseFont(dynamic elem, Map<String, String> style) {
   final eastAsia = globalXmlParser.attr(elem, 'eastAsia');
   final cs = globalXmlParser.attr(elem, 'cs');
 
-  final fonts = [ascii, asciiTheme, hAnsi, eastAsia, cs].where((x) => x != null && x.isNotEmpty).map((x) => encloseFontFamily(x!)).toSet().join(', ');
+  final fonts = [ascii, asciiTheme, hAnsi, eastAsia, cs]
+      .where((x) => x != null && x.isNotEmpty)
+      .map((x) => encloseFontFamily(x!))
+      .toSet()
+      .join(', ');
 
   if (fonts.isNotEmpty) {
     style['font-family'] = fonts;
@@ -293,6 +356,23 @@ String? _themeValue(dynamic c, String attr) {
 
 String? _valueOfMargin(dynamic c) {
   return globalXmlParser.lengthAttr(c, 'w');
+}
+
+String? _valueOfWidth(dynamic element) {
+  final type = globalXmlParser.attr(element, 'type');
+  final raw = globalXmlParser.attr(element, 'w');
+  if (raw == null || type == 'auto' || type == 'nil') return null;
+  if (type == 'pct') {
+    final fiftieths = double.tryParse(raw);
+    if (fiftieths == null) return null;
+    final percent = fiftieths / 50;
+    final text = percent
+        .toStringAsFixed(4)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+    return '$text%';
+  }
+  return globalXmlParser.lengthAttr(element, 'w', LengthUsage.dxa);
 }
 
 String _valueOfBorder(dynamic c) {

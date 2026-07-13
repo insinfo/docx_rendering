@@ -1,0 +1,134 @@
+<section
+  [id]="shellId"
+  class="editor-card tiptap-ui"
+  [class.tiptap-dark]="darkTheme">
+  <header class="editor-card-header">
+    <div class="document-identity">
+      <span class="eyebrow">Documento atual</span>
+      <strong>{{ documentTitle }}</strong>
+    </div>
+
+    <div class="document-actions">
+      <button type="button" class="action-button" (click)="openDocx()" [disabled]="busy">
+        <span data-tiptap-icon="open"></span>Abrir DOCX
+      </button>
+      <button type="button" class="action-button" (click)="openDelta()" [disabled]="busy">
+        <span data-tiptap-icon="code"></span>Abrir Delta
+      </button>
+      <button type="button" class="action-button" (click)="exportDocx()" [disabled]="busy">
+        <span data-tiptap-icon="download"></span>DOCX
+      </button>
+      <button type="button" class="action-button" (click)="exportPdf()" [disabled]="busy">
+        <span data-tiptap-icon="download"></span>PDF
+      </button>
+      <button type="button" class="action-button" (click)="copyDelta()" [disabled]="busy">
+        <span data-tiptap-icon="code"></span>Delta
+      </button>
+      <button type="button" class="action-button" aria-label="Alternar modo de edição" (click)="toggleEditable()">
+        {{ modeLabel }}
+      </button>
+      <button
+        type="button"
+        class="icon-action"
+        title="Alternar tema"
+        aria-label="Alternar tema"
+        (click)="toggleTheme()">
+        <span data-tiptap-icon="sun" data-tiptap-theme-icon></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="progress-strip" [class.active]="busy" aria-hidden="true"><span></span></div>
+
+  <div class="toolbar" role="toolbar" aria-label="Formatação do documento">
+    <div class="tool-group">
+      <button type="button" class="tool-button compact" data-tiptap-action="zoom-out" title="Diminuir zoom" aria-label="Diminuir zoom"><span data-tiptap-icon="minus"></span></button>
+      <button type="button" class="zoom-value" data-tiptap-zoom-value title="Zoom atual">100%</button>
+      <button type="button" class="tool-button compact" data-tiptap-action="zoom-in" title="Aumentar zoom" aria-label="Aumentar zoom"><span data-tiptap-icon="plus"></span></button>
+    </div>
+    <span class="tool-divider"></span>
+
+    <label class="select-tool block-style">
+      <select data-tiptap-control="block-style" aria-label="Estilo do bloco">
+        <option value="paragraph">Texto normal</option>
+        <option value="heading-1">Título 1</option>
+        <option value="heading-2">Título 2</option>
+        <option value="heading-3">Título 3</option>
+      </select>
+    </label>
+    <label class="select-tool font-family">
+      <select data-tiptap-control="font-family" aria-label="Fonte">
+        <option value="Arial">Arial</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Inter">Inter</option>
+      </select>
+    </label>
+    <label class="select-tool font-size">
+      <select data-tiptap-control="font-size" aria-label="Tamanho da fonte">
+        <option>10</option><option>11</option><option selected>12</option>
+        <option>14</option><option>16</option><option>18</option>
+        <option>24</option><option>32</option><option>48</option>
+      </select>
+    </label>
+    <span class="tool-divider"></span>
+
+    <div class="tool-group">
+      <button type="button" class="tool-button" data-tiptap-command="bold" title="Negrito" aria-label="Negrito"><span data-tiptap-icon="bold"></span></button>
+      <button type="button" class="tool-button" data-tiptap-command="italic" title="Itálico" aria-label="Itálico"><span data-tiptap-icon="italic"></span></button>
+      <button type="button" class="tool-button" data-tiptap-command="underline" title="Sublinhado" aria-label="Sublinhado"><span data-tiptap-icon="underline"></span></button>
+      <button type="button" class="tool-button" data-tiptap-command="strike" title="Tachado" aria-label="Tachado"><span data-tiptap-icon="strike"></span></button>
+      <button type="button" class="tool-button" data-tiptap-command="code" title="Código" aria-label="Código"><span data-tiptap-icon="code"></span></button>
+    </div>
+
+    <div class="tool-group color-tools">
+      <label class="color-button" title="Cor do texto">
+        <span>A</span>
+        <input data-tiptap-control="text-color" type="color" value="#2563eb">
+        <i data-tiptap-color-indicator="text-color"></i>
+      </label>
+      <label class="color-button highlight-button" title="Marca-texto">
+        <span>◆</span>
+        <input data-tiptap-control="highlight-color" type="color" value="#fef08a">
+        <i data-tiptap-color-indicator="highlight-color"></i>
+      </label>
+    </div>
+
+    <button type="button" class="tool-button" data-tiptap-action="link" title="Adicionar link" aria-label="Adicionar link"><span data-tiptap-icon="link"></span></button>
+    <button type="button" class="tool-button" data-tiptap-preserve-selection (click)="insertImage()" title="Inserir imagem" aria-label="Inserir imagem"><span data-tiptap-icon="image"></span></button>
+    <span class="tool-divider"></span>
+
+    <div class="tool-group">
+      <button type="button" class="tool-button" data-tiptap-command="bulletList" title="Lista com marcadores" aria-label="Lista com marcadores"><span data-tiptap-icon="list-bullet"></span></button>
+      <button type="button" class="tool-button" data-tiptap-command="orderedList" title="Lista numerada" aria-label="Lista numerada"><span data-tiptap-icon="list-number"></span></button>
+      <button type="button" class="tool-button" data-tiptap-command="align-left" title="Alinhar à esquerda" aria-label="Alinhar à esquerda"><span data-tiptap-icon="align-left"></span></button>
+      <button type="button" class="tool-button" data-tiptap-command="align-center" title="Centralizar" aria-label="Centralizar"><span data-tiptap-icon="align-center"></span></button>
+      <button type="button" class="tool-button" data-tiptap-command="align-right" title="Alinhar à direita" aria-label="Alinhar à direita"><span data-tiptap-icon="align-right"></span></button>
+    </div>
+    <span class="tool-divider"></span>
+
+    <div class="tool-group">
+      <button type="button" class="tool-button" data-tiptap-action="table" title="Inserir tabela" aria-label="Inserir tabela"><span data-tiptap-icon="table"></span></button>
+      <button type="button" class="tool-button" data-tiptap-action="horizontal-rule" title="Linha horizontal" aria-label="Linha horizontal"><span data-tiptap-icon="horizontal-rule"></span></button>
+      <button type="button" class="tool-button" data-tiptap-action="undo" title="Desfazer" aria-label="Desfazer"><span data-tiptap-icon="undo"></span></button>
+      <button type="button" class="tool-button" data-tiptap-action="redo" title="Refazer" aria-label="Refazer"><span data-tiptap-icon="redo"></span></button>
+    </div>
+  </div>
+
+  <section class="document-viewport">
+    <div [id]="pageScaleId" class="page-scale">
+      <article class="page-sheet">
+        <div [id]="editorHostId" class="editor-angular-host" aria-label="Conteúdo do documento"></div>
+      </article>
+    </div>
+  </section>
+
+  <footer class="status-bar">
+    <div><span>{{ wordCount }} palavras</span><span>·</span><span>{{ characterCount }} caracteres</span></div>
+    <div><span class="status-dot" [class.busy]="busy"></span><span>{{ status }}</span></div>
+  </footer>
+
+  <input [id]="docxInputId" class="file-input" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" (change)="onDocxSelected()">
+  <input [id]="deltaInputId" class="file-input" type="file" accept=".json,application/json" (change)="onDeltaSelected()">
+  <input [id]="imageInputId" class="file-input" type="file" accept="image/png,image/jpeg" (change)="onImageSelected()">
+</section>

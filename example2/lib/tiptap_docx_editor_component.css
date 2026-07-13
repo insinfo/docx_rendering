@@ -1,0 +1,118 @@
+:host { display: block; min-width: 0; }
+
+.editor-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(29, 29, 32, .10);
+  border-radius: 17px;
+  background: var(--tiptap-canvas);
+  box-shadow: 0 20px 55px rgba(32, 27, 20, .10), 0 2px 7px rgba(32, 27, 20, .06);
+}
+
+.editor-card-header {
+  min-height: 58px;
+  padding: 8px 12px 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--tiptap-line);
+  background: var(--tiptap-surface);
+}
+
+.document-identity { min-width: 160px; display: grid; gap: 2px; }
+.document-identity .eyebrow { color: var(--tiptap-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.document-identity strong { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.document-actions { display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.action-button, .icon-action {
+  min-height: 34px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--tiptap-line);
+  border-radius: 8px;
+  color: inherit;
+  background: var(--tiptap-surface);
+  font: 650 11px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+}
+.action-button:hover, .icon-action:hover { background: var(--tiptap-accent-soft); }
+.action-button:disabled { cursor: wait; opacity: .55; }
+.icon-action { width: 34px; padding: 0; }
+
+.progress-strip { position: absolute; z-index: 30; top: 58px; left: 0; right: 0; height: 3px; overflow: hidden; opacity: 0; pointer-events: none; }
+.progress-strip.active { opacity: 1; }
+.progress-strip span { display: block; width: 32%; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--tiptap-accent), #37c8b2); animation: progress 1s ease-in-out infinite; }
+@keyframes progress { from { transform: translateX(-110%); } to { transform: translateX(420%); } }
+
+.toolbar { scrollbar-width: thin; }
+.tool-button, .zoom-value { cursor: pointer; }
+.tool-button.compact { min-width: 27px; padding: 0; color: var(--tiptap-muted); }
+.zoom-value { min-width: 48px; color: var(--tiptap-muted); font-size: 12px; }
+.block-style select { width: 112px; }
+.font-family select { width: 100px; }
+.font-size select { width: 54px; }
+.color-button { position: relative; cursor: pointer; }
+.color-button input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.color-button i { position: absolute; bottom: 5px; left: 9px; right: 9px; height: 3px; border-radius: 2px; background: #2563eb; }
+.highlight-button i { background: #fef08a; }
+
+.document-viewport {
+  height: min(72vh, 820px);
+  min-height: 580px;
+  background: linear-gradient(var(--tiptap-canvas), color-mix(in srgb, var(--tiptap-canvas) 86%, #ddd));
+}
+.page-scale { transform-origin: top center; }
+.page-sheet { border: 1px solid rgba(28, 28, 30, .04); }
+.editor-angular-host { min-height: 900px; }
+.page-footer {
+  position: absolute;
+  left: 96px;
+  right: 96px;
+  bottom: 35px;
+  padding-top: 11px;
+  display: flex;
+  justify-content: space-between;
+  color: #a0a0a6;
+  border-top: 1px solid var(--tiptap-line);
+  font-size: 9px;
+}
+
+.status-bar {
+  min-height: 31px;
+  padding: 0 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--tiptap-line);
+  color: var(--tiptap-muted);
+  background: var(--tiptap-surface);
+  font-size: 10px;
+}
+.status-bar > div { display: flex; align-items: center; gap: 7px; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: #36a269; box-shadow: 0 0 0 3px rgba(54, 162, 105, .12); }
+.status-dot.busy { background: var(--tiptap-accent); animation: pulse .8s ease-in-out infinite alternate; }
+@keyframes pulse { to { opacity: .35; } }
+.file-input { display: none; }
+
+.tiptap-dark .editor-card-header,
+.tiptap-dark .status-bar,
+.tiptap-dark .action-button,
+.tiptap-dark .icon-action { background: var(--tiptap-surface); }
+
+@media (max-width: 860px) {
+  .editor-card { border-radius: 0; }
+  .editor-card-header { align-items: flex-start; flex-direction: column; }
+  .document-actions { justify-content: flex-start; }
+  .progress-strip { top: 106px; }
+  .document-viewport { min-height: 520px; }
+}
+
+@media (max-width: 620px) {
+  .action-button { padding-inline: 8px; }
+  .status-bar { justify-content: center; }
+  .status-bar > div:last-child { display: none; }
+}
