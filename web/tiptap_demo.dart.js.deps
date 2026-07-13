@@ -131,6 +131,7 @@ file:///C:/MyDartProjects/docx_rendering/lib/src/quill_delta/delta.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/quill_delta/delta_iterator.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/quill_delta/equality.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/quill_delta/operation.dart
+file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/converters/docx_export.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/converters/docx_import.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/converters/quill_delta.dart
 file:///C:/MyDartProjects/docx_rendering/lib/src/tiptap/core/command_manager.dart

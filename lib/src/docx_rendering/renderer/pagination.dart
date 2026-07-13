@@ -106,6 +106,7 @@ void _paginateSection(web.HTMLElement section) {
   // the text area available to the article is simply (min-height - padding) —
   // the space between the top and bottom margins, matching Word.
   final cs = web.window.getComputedStyle(section);
+  final sectionRect = section.getBoundingClientRect();
   final minH = _px(cs.getPropertyValue('min-height'));
   final padT = _px(cs.getPropertyValue('padding-top'));
   final padB = _px(cs.getPropertyValue('padding-bottom'));
@@ -227,6 +228,12 @@ void _paginateSection(web.HTMLElement section) {
 
   for (final placements in pages) {
     final newSection = section.cloneNode(false) as web.HTMLElement; // attrs+style
+    // §4.1 (R1): páginas fora da viewport não pagam layout/paint. A geometria
+    // conhecida da página vira o placeholder (contain-intrinsic-size), então
+    // o scroll não "pula" quando as páginas materializam.
+    newSection.style.setProperty('content-visibility', 'auto');
+    newSection.style.setProperty('contain-intrinsic-size',
+        '${sectionRect.width.round()}px ${sectionRect.height.round()}px');
     if (header != null) newSection.appendChild(header.cloneNode(true));
     final art = templateArticle.cloneNode(false) as web.HTMLElement;
     for (final p in placements) {

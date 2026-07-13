@@ -32,6 +32,13 @@ class Options {
   bool renderAltChunks;
   Function hFunc;
 
+  /// Progresso do parse cooperativo do corpo (§4.1): chamado a cada
+  /// [parseChunkSize] elementos de corpo parseados.
+  void Function(int parsed)? onParseProgress;
+
+  /// Elementos de corpo entre cada yield do event loop durante o parse.
+  int parseChunkSize;
+
   Options({
     this.inWrapper = true,
     this.hideWrapperOnPrint = false,
@@ -53,6 +60,8 @@ class Options {
     this.renderComments = false,
     this.renderAltChunks = true,
     this.hFunc = h,
+    this.onParseProgress,
+    this.parseChunkSize = 50,
   });
 
   Map<String, dynamic> toMap() {
@@ -89,6 +98,8 @@ Future<WordDocument> parseAsync(Uint8List data, [Options? userOptions]) async {
       DocumentParser(DocumentParserOptions(
         ignoreWidth: ops.ignoreWidth,
         debug: ops.debug,
+        chunkSize: ops.parseChunkSize,
+        onBodyProgress: ops.onParseProgress,
       )),
       ops.toMap());
 }

@@ -91,9 +91,11 @@ List<OpenXmlElement> _parseBodyElements(DocumentParser self, dynamic element) {
 
 Future<List<OpenXmlElement>> _parseBodyElementsAsync(DocumentParser self, dynamic element) async {
   final children = <OpenXmlElement>[];
+  final chunkSize = self.options.chunkSize < 1 ? 50 : self.options.chunkSize;
   int count = 0;
   for (final elem in globalXmlParser.elements(element)) {
-    if (++count % 50 == 0) {
+    if (++count % chunkSize == 0) {
+      self.options.onBodyProgress?.call(count);
       await Future.delayed(Duration.zero);
     }
     switch (globalXmlParser.localName(elem)) {

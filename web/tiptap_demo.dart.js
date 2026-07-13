@@ -7149,9 +7149,8 @@
         t7 === $ && A.throwLateFieldNI("contentMatch");
         t8 = $.$get$ContentMatch_empty();
         if (t7 !== t8) {
-          t6 = t5 ? child.get$nodeSize() : 0;
-          t7 = t5 ? child.content.content.length : 0;
-          inner = A.findSelectionIn(doc, child, pos + dir + t6, t7, dir, textOnly);
+          t6 = t5 ? child.content.content.length : 0;
+          inner = A.findSelectionIn(doc, child, pos + dir, t6, dir, textOnly);
           if (inner != null)
             return inner;
         } else {

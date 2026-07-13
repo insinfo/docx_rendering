@@ -81,12 +81,12 @@ A view deixou de ser scaffold e agora é uma implementação funcional inicial. 
 ### 4.1. Abertura eficiente
 O `WordDocument.load` atual é monolítico. Estratégia em três camadas, da mais barata para a mais cara — **implementar nessa ordem e medir antes de avançar** (pode ser que as duas primeiras bastem):
 
-1. **Parse cooperativo:** o Dart compilado para JS não tem isolates; trabalho longo deve ceder o event loop. Inserir pontos de `await Future.delayed(Duration.zero)` a cada N parágrafos no parser e no conversor DOCX→PM, com callback de progresso (barra de carregamento na UI).
-2. **`content-visibility: auto`** + `contain-intrinsic-size` nas `<section>` de página geradas pela paginação: o browser pula layout/paint das páginas fora da viewport. Ganho grande, custo de uma linha de CSS.
+1. **[x] Parse cooperativo:** o Dart compilado para JS não tem isolates; trabalho longo deve ceder o event loop. **Feito:** `_parseBodyElementsAsync` cede o event loop a cada `chunkSize` elementos (default 50) e reporta progresso; exposto em `Options.onParseProgress`/`Options.parseChunkSize` → `parseAsync`.
+2. **[x] `content-visibility: auto`** + `contain-intrinsic-size` nas `<section>` de página geradas pela paginação: o browser pula layout/paint das páginas fora da viewport. **Feito** na fase Build de `pagination.dart` (placeholder com a geometria real da página); validado no harness Puppeteer (screenshot do meio do documento renderiza integralmente).
 3. **Virtualização real (se necessário):** páginas fora de uma janela de ±10 viram placeholders `<div>` com altura fixa conhecida (a geometria já foi calculada na fase Plan da paginação); `IntersectionObserver` materializa/desmaterializa ao rolar. A árvore ProseMirror permanece completa em memória (ela é barata — estrutura persistente imutável); só o DOM é virtualizado, via `Decoration.node` marcando páginas ocultas.
 
 ### 4.2. Conversor DOCX → ProseMirror direto
-- [ ] Criar `lib/src/tiptap/converters/docx_import.dart`: traversal do `WordDocument` (já parseado por `docx_rendering`) emitindo `PMNode`s direto, **sem materializar HTML no DOM**. O caminho atual (renderAsync → DOM → DOMParser.parse) fica como fallback de validação nos testes (comparar os dois resultados).
+- [x] Criar `lib/src/tiptap/converters/docx_import.dart`: traversal do `WordDocument` (já parseado por `docx_rendering`) emitindo `PMNode`s direto, **sem materializar HTML no DOM**. **Feito** (parágrafos/headings/alinhamento via `cssStyle['text-align']`, runs com marcas, tabelas, imagens, hyperlink/ins/del pass-through); validado pelo round-trip com o exportador em `test_docx_roundtrip_browser.dart`.
 - [ ] Schema do editor com atributos suficientes para round-trip: estilo de parágrafo, alinhamento, indentação, spacing, larguras de coluna em twips, propriedades de seção (guardadas em `doc.attrs`).
 
 ### 4.3. Paginação incremental
@@ -99,15 +99,16 @@ Hoje `paginate()` reprocessa o documento inteiro. Para edição:
 
 ## 5. PIPELINES DE CONVERSÃO
 
-### 5.1. Exportação DOCX (R2) — via `docx_dart`
-- [ ] Criar `lib/src/tiptap/converters/docx_export.dart`: traversal do `PMNode` → API do `docx_dart` (`Document()`, `addParagraph`, `addTable`, `addPicture` com bytes, `addHeading` por nível, headers/footers a partir de `doc.attrs`). Saída por bytes (web-safe).
-- [ ] Teste de round-trip: DOCX de `resources/` → importar → exportar → reimportar → comparar ASTs (tolerância documentada para o que não é preservado).
-- Mapa mínimo: `paragraph`→`addParagraph`+runs com bold/italic/underline/cor/fonte; `heading[level]`→`addHeading`; `table`→`addTable` com merges; `image`→`addPicture`; listas→numbering do docx_dart.
+### 5.1. Exportação DOCX (R2) — gerador OOXML próprio (decisão revisada)
+**Decisão (jul/2026): NÃO usar `docx_dart` como dependência** — restrição confirmada pelo usuário de que o runtime só pode depender de `package:web`. Em vez disso, `docx_export.dart` gera WordprocessingML diretamente (strings) e empacota com o `ZipArchive` próprio do repositório (`lib/src/docx_rendering/zip/`), que já tem deflate/encode. O `docx_dart` permanece apenas como referência de código.
+- [x] Criar `lib/src/tiptap/converters/docx_export.dart` (`DocxExporter`): traversal do `PMNode` emitindo `document.xml`, `styles.xml` (Normal, Heading 1..9, ListParagraph), `numbering.xml` (bullet/decimal), `[Content_Types].xml`, rels e `word/media/*`. Pipeline cooperativo (yield a cada `chunkSize` blocos + callback de progresso). Saída por bytes (web-safe, roda também na VM).
+- [x] Teste de round-trip: exportar → reimportar com `parseAsync`+`DocxImporter` → comparar (browser, `test/tiptap/converters/test_docx_roundtrip_browser.dart`); validação estrutural do pacote na VM (`test_docx_export.dart`, 8 testes). **R2 medido:** 6000 parágrafos (~200 páginas) exportados < 3 s na VM.
+- Mapa implementado: `paragraph`→`<w:p>`+runs com bold/italic/underline/strike/cor/fonte/tamanho/highlight; `heading[level]`→`pStyle Heading{n}`; `table`→`<w:tbl>` com bordas e `gridSpan` (colspan); `image` data-URI→`<w:drawing>`+media+rel; listas→`numPr`+numbering. Perdas documentadas: link vira texto, `horizontalRule` vira parágrafo vazio, rowspan não emitido, imagem por URL http ignorada.
 
 ### 5.2. Exportação PDF (R4) — vetorial via porte `jsPDF`
 **Decisão: 100% vetorial, sem canvas/rasterização** (o plano anterior estava contraditório nesse ponto). Texto selecionável, arquivo pequeno, geração rápida.
 
-- [ ] Copiar o porte de `C:\MyDartProjects\jsPDF\` para dentro do projeto (ou depender por path) — ele é auto-contido.
+- [ ] Copiar o porte de `C:\MyDartProjects\jsPDF\` para dentro do projeto o que for necessario  — ele é auto-contido.
 - [ ] Criar `lib/src/tiptap/converters/pdf_export.dart`: traversal do `PMNode` emitindo `pdf.text()`, `pdf.rect()`/linhas para bordas de tabela, `pdf.addImage()` para imagens.
 - [ ] **Reusar a geometria da paginação**: a fase Plan já calculou onde cada bloco quebra de página e as larguras/altura de linha. O exportador consome esse plano em vez de recalcular word-wrap do zero — é isso que garante (a) PDF idêntico ao que se vê na tela e (b) velocidade. Para texto, `split_text_to_size.dart` do jsPDF só como fallback quando não houver plano (export sem render prévio).
 - [ ] Fontes: embutir/subsetar TTF via `ttffont.dart` (uma vez por documento, cache por família+peso); bold/italic mapeados para as variantes da família.

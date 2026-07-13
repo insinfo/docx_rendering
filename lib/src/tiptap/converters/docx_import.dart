@@ -89,10 +89,13 @@ class DocxImporter {
       }
     }
 
-    // Convert styles to attributes
+    // Convert styles to attributes. O parser guarda o `w:jc` em
+    // cssStyle['text-align'] (o campo textAlignment é o alinhamento
+    // vertical do OOXML, outra coisa).
     final attrs = <String, dynamic>{};
-    if (elem.textAlignment != null) {
-      attrs['textAlign'] = elem.textAlignment;
+    final textAlign = elem.cssStyle?['text-align'];
+    if (textAlign != null) {
+      attrs['textAlign'] = textAlign;
     }
     // Extract heading level if applicable
     if (elem.styleName != null && elem.styleName!.startsWith('Heading')) {

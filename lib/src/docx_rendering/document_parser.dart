@@ -29,9 +29,19 @@ class DocumentParserOptions {
   bool ignoreWidth;
   bool debug;
 
+  /// Elementos de corpo processados entre cada yield do event loop no
+  /// parse cooperativo (§4.1 do plano).
+  int chunkSize;
+
+  /// Progresso do parse cooperativo do corpo: chamado a cada chunk com o
+  /// número de elementos de corpo já parseados.
+  void Function(int parsed)? onBodyProgress;
+
   DocumentParserOptions({
     this.ignoreWidth = false,
     this.debug = false,
+    this.chunkSize = 50,
+    this.onBodyProgress,
   });
 }
 
