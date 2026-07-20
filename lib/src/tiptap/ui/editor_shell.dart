@@ -342,18 +342,30 @@ class TiptapEditorShell {
             '48': '48',
           },
           selected: '12'),
-      _plainTool('A↑'),
-      _plainTool('A↓'),
+      _iconTool('font-increase', attrs: {
+        'data-tiptap-command': 'font-grow',
+        'title': 'Aumentar Tamanho da Fonte',
+      }),
+      _iconTool('font-decrease', attrs: {
+        'data-tiptap-command': 'font-shrink',
+        'title': 'Diminuir Tamanho da Fonte',
+      }),
+      _buildChangeCaseMenu(),
     ]);
     final fontBottom = _ribbonRow([
       for (final command in const [
-        ('bold', 'bold'),
-        ('italic', 'italic'),
-        ('underline', 'underline'),
-        ('strike', 'strike'),
-        ('code', 'code'),
+        ('bold', 'bold', 'Negrito'),
+        ('italic', 'italic', 'Itálico'),
+        ('underline', 'underline', 'Sublinhado'),
+        ('strike', 'strike', 'Tachado'),
+        ('subscript', 'subscript', 'Subscrito'),
+        ('superscript', 'superscript', 'Sobrescrito'),
+        ('code', 'code', 'Código'),
       ])
-        _iconTool(command.$2, attrs: {'data-tiptap-command': command.$1}),
+        _iconTool(command.$2, attrs: {
+          'data-tiptap-command': command.$1,
+          'title': command.$3,
+        }),
       ..._colorControlButtons(),
     ]);
     final paragraphTop = _ribbonRow([
@@ -1166,24 +1178,171 @@ class TiptapEditorShell {
   web.HTMLElement _plainTool(String label) =>
       _el('button', classes: 'ribbon-text-command', text: label);
 
-  List<web.HTMLElement> _colorControlButtons() {
-    final buttons = <web.HTMLElement>[];
+  web.HTMLElement _buildChangeCaseMenu() {
+    final trigger = _iconTool('change-case', attrs: {
+      'data-tiptap-preserve-selection': '',
+      'title': 'Maiúsculas e Minúsculas',
+      'aria-haspopup': 'menu',
+      'aria-controls': 'change-case-menu',
+    });
+    final menu = _el('div',
+        classes: 'menu-panel change-case-menu',
+        id: 'change-case-menu',
+        attrs: {'role': 'menu', 'aria-label': 'Maiúsculas e minúsculas'});
     for (final item in const [
-      ('text-color', 'A', '#2563eb'),
-      ('highlight-color', '◆', '#fef08a'),
+      ('sentence', 'Primeira letra da frase em maiúscula.'),
+      ('lower', 'minúscula'),
+      ('upper', 'MAIÚSCULAS'),
+      ('title', 'Colocar Cada Palavra em Maiúscula'),
+      ('toggle', 'aLTERNAR mAIÚSC./mINÚSC.'),
     ]) {
-      final label = _el('label', classes: 'color-button', text: item.$2);
-      label
-        ..appendChild((_el('input', id: item.$1) as web.HTMLInputElement)
-          ..type = 'color'
-          ..value = item.$3
-          ..setAttribute('data-tiptap-control', item.$1))
-        ..appendChild(_el('i', id: '${item.$1}-line', attrs: {
-          'data-tiptap-color-indicator': item.$1,
-        }));
-      buttons.add(label);
+      menu.appendChild(_el('button',
+          classes: 'ribbon-text-command',
+          text: item.$2,
+          attrs: {'role': 'menuitem', 'data-tiptap-case': item.$1}));
     }
-    return buttons;
+    final dropdown = _own(TiptapDropdown(
+      trigger: trigger,
+      panel: menu,
+      portalHost: root,
+      classes: 'change-case-dropdown',
+    ));
+    return dropdown.root;
+  }
+
+  /// Word's theme palette: base colors plus the classic five-variant column
+  /// (three tints, two shades).
+  static const _themeColors = [
+    '#FFFFFF', '#000000', '#E7E6E6', '#44546A', '#4472C4',
+    '#ED7D31', '#A5A5A5', '#FFC000', '#5B9BD5', '#70AD47',
+  ];
+  static const _standardColors = [
+    '#C00000', '#FF0000', '#FFC000', '#FFFF00', '#92D050',
+    '#00B050', '#00B0F0', '#0070C0', '#002060', '#7030A0',
+  ];
+  static const _highlightColors = [
+    '#FFFF00', '#00FF00', '#00FFFF', '#FF00FF', '#0000FF',
+    '#FF0000', '#00008B', '#008080', '#008000', '#800080',
+    '#8B0000', '#808000', '#808080', '#C0C0C0', '#000000',
+  ];
+
+  static String _mix(String hex, double factor, {required bool toWhite}) {
+    final value = int.parse(hex.substring(1), radix: 16);
+    int channel(int shift) {
+      final component = (value >> shift) & 0xff;
+      final mixed = toWhite
+          ? component + ((255 - component) * factor)
+          : component * (1 - factor);
+      return mixed.round().clamp(0, 255);
+    }
+
+    String pad(int v) => v.toRadixString(16).padLeft(2, '0');
+    return '#${pad(channel(16))}${pad(channel(8))}${pad(channel(0))}'
+        .toUpperCase();
+  }
+
+  web.HTMLElement _swatch(String control, String value, {String? label}) =>
+      _el('button', classes: 'color-swatch', attrs: {
+        'type': 'button',
+        'data-tiptap-swatch': value,
+        'data-tiptap-swatch-target': control,
+        'title': label ?? value,
+        'aria-label': label ?? value,
+        'style': value == 'auto' || value == 'none'
+            ? ''
+            : 'background:$value;',
+      });
+
+  List<web.HTMLElement> _colorControlButtons() => [
+        _buildColorPalette('text-color',
+            icon: 'text-color', label: 'Cor da Fonte', initial: '#C00000'),
+        _buildColorPalette('highlight-color',
+            icon: 'highlight',
+            label: 'Cor de Realce do Texto',
+            initial: '#FFFF00'),
+      ];
+
+  web.HTMLElement _buildColorPalette(String control,
+      {required String icon, required String label, required String initial}) {
+    final trigger = _el('label', classes: 'color-button', attrs: {
+      'title': label,
+      'aria-haspopup': 'menu',
+      'data-tiptap-preserve-selection': '',
+    });
+    trigger
+      ..appendChild(
+          _el('span', classes: 'button-icon', attrs: {'data-tiptap-icon': icon}))
+      // O input nativo permanece como "Mais Cores..." e para compatibilidade
+      // com o contrato data-tiptap-control existente.
+      ..appendChild((_el('input', id: control) as web.HTMLInputElement)
+        ..type = 'color'
+        ..value = initial
+        ..setAttribute('data-tiptap-control', control)
+        ..classList.add('color-native-input'))
+      ..appendChild(_el('i', id: '$control-line', attrs: {
+        'data-tiptap-color-indicator': control,
+        'style': 'background:$initial;',
+      }));
+
+    final menu = _el('div',
+        classes: 'menu-panel color-palette-menu',
+        id: '$control-menu',
+        attrs: {'role': 'menu', 'aria-label': label});
+    if (control == 'text-color') {
+      menu.appendChild(_el('button',
+          classes: 'ribbon-text-command color-auto-item',
+          attrs: {'role': 'menuitem', 'data-tiptap-swatch': 'auto',
+                  'data-tiptap-swatch-target': control})
+        ..appendChild(_el('span', classes: 'color-swatch is-auto'))
+        ..appendChild(_el('span', text: 'Automático')));
+      menu.appendChild(
+          _el('div', classes: 'color-palette-caption', text: 'Cores do Tema'));
+      final themeGrid = _el('div', classes: 'color-palette-grid');
+      for (final base in _themeColors) {
+        themeGrid.appendChild(_swatch(control, base));
+      }
+      for (final factor in const [
+        (0.8, true), (0.6, true), (0.4, true), (0.25, false), (0.5, false),
+      ]) {
+        for (final base in _themeColors) {
+          themeGrid.appendChild(
+              _swatch(control, _mix(base, factor.$1, toWhite: factor.$2)));
+        }
+      }
+      menu.appendChild(themeGrid);
+      menu.appendChild(
+          _el('div', classes: 'color-palette-caption', text: 'Cores Padrão'));
+      final standardRow = _el('div', classes: 'color-palette-grid');
+      for (final color in _standardColors) {
+        standardRow.appendChild(_swatch(control, color));
+      }
+      menu.appendChild(standardRow);
+    } else {
+      final grid = _el('div', classes: 'color-palette-grid is-highlight');
+      for (final color in _highlightColors) {
+        grid.appendChild(_swatch(control, color));
+      }
+      menu
+        ..appendChild(grid)
+        ..appendChild(_el('button',
+            classes: 'ribbon-text-command color-auto-item',
+            attrs: {'role': 'menuitem', 'data-tiptap-swatch': 'none',
+                    'data-tiptap-swatch-target': control})
+          ..appendChild(_el('span', classes: 'color-swatch is-none'))
+          ..appendChild(_el('span', text: 'Sem Cor')));
+    }
+    menu.appendChild(_el('button',
+        classes: 'ribbon-text-command color-more-item',
+        attrs: {'role': 'menuitem', 'data-tiptap-more-colors': control},
+        text: 'Mais Cores…'));
+
+    final dropdown = _own(TiptapDropdown(
+      trigger: trigger,
+      panel: menu,
+      portalHost: root,
+      classes: 'color-palette-dropdown',
+    ));
+    return dropdown.root;
   }
 
   web.HTMLElement _styleGallery() {

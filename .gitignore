@@ -20,3 +20,5 @@ resources/01.zip
 resources/01
 resources/word.example/
 extracted_icons/
+.local-chrome/
+resources/onlyoffice_ribbon_icons/

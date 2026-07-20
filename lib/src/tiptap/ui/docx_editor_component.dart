@@ -88,6 +88,8 @@ class TiptapDocxEditorComponent {
         ItalicExtension(),
         UnderlineExtension(),
         StrikeExtension(),
+        SubscriptExtension(),
+        SuperscriptExtension(),
         CodeExtension(),
         LinkExtension(),
         TextStyleExtension(),
@@ -129,6 +131,7 @@ class TiptapDocxEditorComponent {
     _bindTabStopActions();
     _bindContextualActions();
     _bindInsertActions();
+    _bindFontActions();
     shell.modeChanges.listen(_applyEditorMode);
     _applyEditorMode(shell.mode, announce: false);
     if (options.exposeDebugApi) _exposeDebugApi();
@@ -1095,6 +1098,90 @@ class TiptapDocxEditorComponent {
     }
   }
 
+  /// Bindings for controls whose dropdown panels are portaled to the shell
+  /// root (outside `#editor-frame`, where o toolbar controller não escuta):
+  /// menu Aa e as paletas de cor do Word.
+  void _bindFontActions() {
+    final caseItems = shell.root.querySelectorAll('[data-tiptap-case]');
+    for (var i = 0; i < caseItems.length; i++) {
+      final item = caseItems.item(i);
+      if (item is! web.HTMLElement) continue;
+      item
+        ..addEventListener('mousedown',
+            ((web.Event event) => event.preventDefault()).toJS)
+        ..addEventListener(
+            'click',
+            (web.Event _) {
+              final mode = item.getAttribute('data-tiptap-case');
+              if (mode == null) return;
+              final handled = editor.chain.focus().transformCase(mode).run();
+              if (!handled) {
+                _toast('Selecione o texto que deve mudar de caixa.',
+                    error: true);
+              }
+            }.toJS);
+    }
+
+    final swatches = shell.root.querySelectorAll('[data-tiptap-swatch]');
+    for (var i = 0; i < swatches.length; i++) {
+      final swatch = swatches.item(i);
+      if (swatch is! web.HTMLElement) continue;
+      swatch
+        ..addEventListener('mousedown',
+            ((web.Event event) => event.preventDefault()).toJS)
+        ..addEventListener(
+            'click',
+            (web.Event _) {
+              final value = swatch.getAttribute('data-tiptap-swatch');
+              final target =
+                  swatch.getAttribute('data-tiptap-swatch-target');
+              if (value == null || target == null) return;
+              _applySwatch(target, value);
+            }.toJS);
+    }
+
+    final moreButtons =
+        shell.root.querySelectorAll('[data-tiptap-more-colors]');
+    for (var i = 0; i < moreButtons.length; i++) {
+      final button = moreButtons.item(i);
+      if (button is! web.HTMLElement) continue;
+      button.addEventListener(
+          'click',
+          (web.Event _) {
+            final control = button.getAttribute('data-tiptap-more-colors');
+            final input = shell.root.querySelector('#$control');
+            if (input is web.HTMLInputElement) input.click();
+          }.toJS);
+    }
+  }
+
+  void _applySwatch(String target, String value) {
+    final chain = editor.chain.focus();
+    if (target == 'text-color') {
+      if (value == 'auto') {
+        chain.unsetColor();
+      } else {
+        chain.setColor(value);
+      }
+    } else {
+      if (value == 'none') {
+        chain.unsetHighlight();
+      } else {
+        chain.setHighlight(value);
+      }
+    }
+    chain.run();
+    if (value != 'auto' && value != 'none') {
+      final indicator = shell.root
+          .querySelector('[data-tiptap-color-indicator="$target"]');
+      if (indicator is web.HTMLElement) {
+        indicator.style.backgroundColor = value;
+      }
+      final input = shell.root.querySelector('#$target');
+      if (input is web.HTMLInputElement) input.value = value;
+    }
+  }
+
   void _openPageRegion(String kind) {
     final region = shell.editorElement.querySelector('.tiptap-page-$kind');
     if (region is! web.HTMLElement) {
@@ -1632,6 +1719,16 @@ class TiptapDocxEditorComponent {
           .then((bytes) => base64.encode(bytes).toJS)
           .toJS).toJS,
     );
+    window.setProperty(
+        'getTiptapSelection'.toJS,
+        (() {
+          final selection = editor.state.selection;
+          return jsonEncode({
+            'from': selection.from,
+            'to': selection.to,
+            'empty': selection.from == selection.to,
+          });
+        }).toJS);
     window.setProperty('toggleTiptapBulletList'.toJS,
         (() => editor.chain.focus().toggleBulletList().run()).toJS);
     window.setProperty('toggleTiptapHeading'.toJS,

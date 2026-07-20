@@ -1,9 +1,20 @@
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 import 'dart:math' as math;
 
 import 'package:web/web.dart' as web;
 
 import '../../prosemirror/view/index.dart';
+import '../extensions/table_commands.dart' show applyColumnWidths;
+
+/// Pointer coordinates can be fractional (zoom, high-DPI); package:web types
+/// them as `int`, which throws on non-integral JS numbers. Read them as raw
+/// JS numbers instead.
+double _clientX(web.PointerEvent event) =>
+    ((event as JSObject).getProperty('clientX'.toJS) as JSNumber).toDartDouble;
+
+double _clientY(web.PointerEvent event) =>
+    ((event as JSObject).getProperty('clientY'.toJS) as JSNumber).toDartDouble;
 
 /// Word-style rulers for the paginated editor.
 ///
@@ -50,6 +61,10 @@ class WordRulers {
   JSFunction? _marginPointerMoveListener;
   JSFunction? _marginPointerEndListener;
   _MarginDrag? _marginDrag;
+  web.HTMLElement? _hTableCols;
+  _TableColDrag? _tableColDrag;
+  JSFunction? _tableColMoveListener;
+  JSFunction? _tableColEndListener;
   JSFunction? _viewportScrollListener;
   JSFunction? _windowResizeListener;
   String _geometryKey = '';
@@ -89,12 +104,14 @@ class WordRulers {
     _updateVerticalVisibility();
     _positionIndentMarkers(geometry);
     _positionTabMarkers(geometry);
+    _positionTableColumns(geometry);
   }
 
   void destroy() {
     _finishIndentDrag(commit: false);
     _finishTabDrag(commit: false);
     _finishMarginDrag(commit: false);
+    _finishTableColDrag(commit: false);
     if (_viewport != null && _viewportScrollListener != null) {
       _viewport!.removeEventListener('scroll', _viewportScrollListener);
     }
@@ -196,11 +213,15 @@ class WordRulers {
     indents.className = 'tiptap-ruler-indents';
     final tabs = web.document.createElement('div') as web.HTMLElement;
     tabs.className = 'tiptap-ruler-tabs';
+    final tableCols = web.document.createElement('div') as web.HTMLElement;
+    tableCols.className = 'tiptap-ruler-table-cols';
     ruler
       ..appendChild(scale)
       ..appendChild(margins)
       ..appendChild(indents)
-      ..appendChild(tabs);
+      ..appendChild(tabs)
+      ..appendChild(tableCols);
+    _hTableCols = tableCols;
     center.appendChild(ruler);
     track.appendChild(center);
     final chrome = viewport.parentElement;
@@ -242,18 +263,25 @@ class WordRulers {
     _indentPointerDownListener = ((web.Event rawEvent) {
       if (rawEvent is! web.PointerEvent) return;
       final target = rawEvent.target;
-      if (target is web.Element &&
-          target.closest('[data-ruler-margin]') != null) {
-        _beginMarginDrag(rawEvent);
-      } else if (target is web.Element &&
-          target.closest('[data-ruler-tab]') != null) {
+      if (target is! web.Element) return;
+      // A fresh text selection may still be sitting in the DOM observer's
+      // queue (selectionchange is async). Flush it so ruler gestures see the
+      // real selection — the toolbar does the same on pointerdown.
+      view.domObserver.forceFlush();
+      // Word's priority when controls overlap: table column markers and tab
+      // stops win, then indent markers; the margin boundary only reacts
+      // where no marker sits under the pointer, and a bare click on the
+      // scale creates a tab stop.
+      if (target.closest('[data-ruler-table-col]') != null) {
+        _beginTableColDrag(rawEvent);
+      } else if (target.closest('[data-ruler-tab]') != null) {
         _beginTabDrag(rawEvent);
-      } else if (target is web.Element &&
-          target.closest('.tiptap-horizontal-ruler') != null &&
-          target.closest('[data-ruler-indent]') == null) {
-        _addTabAtPointer(rawEvent);
-      } else {
+      } else if (target.closest('[data-ruler-indent]') != null) {
         _beginIndentDrag(rawEvent);
+      } else if (target.closest('[data-ruler-margin]') != null) {
+        _beginMarginDrag(rawEvent);
+      } else if (target.closest('.tiptap-horizontal-ruler') != null) {
+        _addTabAtPointer(rawEvent);
       }
     }).toJS;
     track.addEventListener('pointerdown', _indentPointerDownListener);
@@ -468,7 +496,7 @@ class WordRulers {
     final length =
         vertical ? drag.geometry.pageHeight : drag.geometry.pageWidth;
     final pointer =
-        vertical ? event.clientY - rect.top : event.clientX - rect.left;
+        vertical ? _clientY(event) - rect.top : _clientX(event) - rect.left;
     final logical =
         (pointer * length / renderedLength).clamp(0.0, length).toDouble();
     const minimumContent = 48.0;
@@ -491,9 +519,16 @@ class WordRulers {
           ? drag.start
           : length - drag.end,
     );
+    if (!vertical) {
+      _showTabFeedback(
+        drag.side == 'left' ? drag.start : length - drag.end,
+        null,
+      );
+    }
   }
 
   void _finishMarginDrag({required bool commit}) {
+    _hideTabFeedback();
     final drag = _marginDrag;
     if (drag == null) return;
     final windowTarget = web.window as web.EventTarget;
@@ -806,6 +841,21 @@ class WordRulers {
       ..preventDefault()
       ..stopPropagation();
     final inlineStyle = block.getAttribute('style');
+    final targets = <_IndentDragTarget>[
+      for (final selected in _selectionTextblocks())
+        _IndentDragTarget(
+          position: selected.position,
+          attrs: Map<String, dynamic>.from(selected.node.attrs),
+          dom: switch (view.nodeDOM(selected.position)) {
+            final web.HTMLElement element => element,
+            _ => null,
+          },
+          inlineStyle: switch (view.nodeDOM(selected.position)) {
+            final web.HTMLElement element => element.getAttribute('style'),
+            _ => null,
+          },
+        ),
+    ];
     _indentDrag = _IndentDrag(
       kind: kind,
       geometry: geometry,
@@ -815,6 +865,7 @@ class WordRulers {
       originalInlineStyle: inlineStyle,
       paddingLeft: current.paddingLeft,
       paddingRight: current.paddingRight,
+      targets: targets,
       left: current.left,
       right: current.right,
       first: current.first,
@@ -843,7 +894,7 @@ class WordRulers {
     final rect = ruler.getBoundingClientRect();
     if (rect.width <= 0) return;
     final logical =
-        ((event.clientX - rect.left) * drag.geometry.pageWidth / rect.width)
+        ((_clientX(event) - rect.left) * drag.geometry.pageWidth / rect.width)
             .clamp(0.0, drag.geometry.pageWidth)
             .toDouble();
     final contentStart = drag.geometry.marginLeft;
@@ -872,14 +923,27 @@ class WordRulers {
     final marginLeft = drag.left - contentStart - drag.paddingLeft;
     final marginRight = contentEnd - drag.right - drag.paddingRight;
     final textIndent = drag.first - drag.left;
-    drag.block.style
-      ..marginLeft = _px(marginLeft)
-      ..marginRight = _px(marginRight)
-      ..textIndent = _px(textIndent);
+    // Live preview on every selected paragraph, like Word.
+    for (final target in drag.targets) {
+      final dom = target.dom;
+      if (dom == null) continue;
+      dom.style
+        ..marginLeft = _px(marginLeft)
+        ..marginRight = _px(marginRight)
+        ..textIndent = _px(textIndent);
+    }
     _placeIndentMarker('first', drag.first);
     _placeIndentMarker('hanging', drag.left);
     _placeIndentMarker('left', drag.left);
     _placeIndentMarker('right', drag.right);
+    _showTabFeedback(
+      switch (drag.kind) {
+        'first' => drag.first,
+        'right' => drag.right,
+        _ => drag.left,
+      },
+      null,
+    );
   }
 
   void _finishIndentDrag({required bool commit}) {
@@ -899,9 +963,20 @@ class WordRulers {
     }
     _indentPointerMoveListener = null;
     _indentPointerEndListener = null;
+    _hideTabFeedback();
     _hTrack?.classList.remove('tiptap-ruler-dragging');
     _hIndents?.querySelector('.is-dragging')?.classList.remove('is-dragging');
 
+    // Drop the live preview styles from every selected paragraph.
+    for (final target in drag.targets) {
+      final dom = target.dom;
+      if (dom == null || !dom.isConnected) continue;
+      if (target.inlineStyle == null) {
+        dom.removeAttribute('style');
+      } else {
+        dom.setAttribute('style', target.inlineStyle!);
+      }
+    }
     if (drag.originalInlineStyle == null) {
       drag.block.removeAttribute('style');
     } else {
@@ -914,23 +989,30 @@ class WordRulers {
       return;
     }
 
-    final attrs = Map<String, dynamic>.from(drag.originalAttrs);
     final contentStart = drag.geometry.marginLeft;
     final contentEnd = drag.geometry.pageWidth - drag.geometry.marginRight;
-    attrs
-      ..['marginLeft'] = _px(drag.left - contentStart - drag.paddingLeft)
-      ..['marginRight'] = _px(contentEnd - drag.right - drag.paddingRight)
-      ..['textIndent'] = _px(drag.first - drag.left);
-    final node = view.state.doc.nodeAt(drag.nodePosition);
-    if (node == null || !node.isTextblock) return;
+    final marginLeft = _px(drag.left - contentStart - drag.paddingLeft);
+    final marginRight = _px(contentEnd - drag.right - drag.paddingRight);
+    final textIndent = _px(drag.first - drag.left);
+    // One transaction covering every selected paragraph; setNodeMarkup keeps
+    // node sizes stable, so the captured positions remain valid.
     final transaction = view.state.tr;
-    transaction.setNodeMarkup(
-      drag.nodePosition,
-      null,
-      attrs,
-      node.marks,
-    );
-    view.dispatch(transaction);
+    var changed = false;
+    for (final target in drag.targets) {
+      final node = view.state.doc.nodeAt(target.position);
+      if (node == null || !node.isTextblock) continue;
+      transaction.setNodeMarkup(
+        target.position,
+        null,
+        Map<String, dynamic>.from(target.attrs)
+          ..['marginLeft'] = marginLeft
+          ..['marginRight'] = marginRight
+          ..['textIndent'] = textIndent,
+        node.marks,
+      );
+      changed = true;
+    }
+    if (changed) view.dispatch(transaction);
   }
 
   void _placeIndentMarker(String kind, double position) {
@@ -991,8 +1073,21 @@ class WordRulers {
     if (ruler == null || geometry == null || target == null) return;
     final rect = ruler.getBoundingClientRect();
     if (rect.width <= 0) return;
+    // A click that narrowly misses an indent/margin control is a failed drag,
+    // not a request for a new tab stop — Word ignores it too.
+    final controls =
+        ruler.querySelectorAll('[data-ruler-indent], [data-ruler-margin]');
+    for (var i = 0; i < controls.length; i++) {
+      final control = controls.item(i);
+      if (control is! web.Element) continue;
+      final controlRect = control.getBoundingClientRect();
+      if (_clientX(event) >= controlRect.left - 6 &&
+          _clientX(event) <= controlRect.right + 6) {
+        return;
+      }
+    }
     final logical =
-        (event.clientX - rect.left) * geometry.pageWidth / rect.width;
+        (_clientX(event) - rect.left) * geometry.pageWidth / rect.width;
     final contentWidth =
         geometry.pageWidth - geometry.marginLeft - geometry.marginRight;
     var position = logical - geometry.marginLeft;
@@ -1079,12 +1174,12 @@ class WordRulers {
         drag.geometry.marginLeft -
         drag.geometry.marginRight;
     final logical =
-        (event.clientX - rect.left) * drag.geometry.pageWidth / rect.width;
+        (_clientX(event) - rect.left) * drag.geometry.pageWidth / rect.width;
     drag.position = _snapTab(logical - drag.geometry.marginLeft)
         .clamp(0.0, contentWidth)
         .toDouble();
     drag.removed =
-        event.clientY < rect.top - 28 || event.clientY > rect.bottom + 28;
+        _clientY(event) < rect.top - 28 || _clientY(event) > rect.bottom + 28;
     final marker = _hTabs?.querySelector('[data-ruler-tab="${drag.index}"]');
     if (marker is web.HTMLElement) {
       marker
@@ -1165,16 +1260,30 @@ class WordRulers {
 
   void _setTabStops(
       int position, dynamic node, List<Map<String, dynamic>> stops) {
-    final current = view.state.doc.nodeAt(position);
-    if (current == null || !current.isTextblock) return;
-    final attrs = Map<String, dynamic>.from(current.attrs)
-      ..['tabStops'] = stops.isEmpty ? null : stops;
+    // Word applies tab-stop edits to every paragraph in the selection (the
+    // dialog and the ruler behave the same way); the anchor paragraph is
+    // included even when the selection resolver misses it.
+    final targets = _selectionTextblocks();
+    if (!targets.any((target) => target.position == position)) {
+      targets.add((position: position, node: node));
+    }
     final transaction = view.state.tr;
-    transaction.setNodeMarkup(position, null, attrs, current.marks);
-    view.dispatch(transaction);
+    var changed = false;
+    for (final target in targets) {
+      final current = view.state.doc.nodeAt(target.position);
+      if (current == null || !current.isTextblock) continue;
+      final attrs = Map<String, dynamic>.from(current.attrs)
+        ..['tabStops'] = stops.isEmpty ? null : stops;
+      transaction.setNodeMarkup(target.position, null, attrs, current.marks);
+      changed = true;
+    }
+    if (changed) view.dispatch(transaction);
   }
 
-  void _showTabFeedback(double pagePosition, String text) {
+  /// Shows Word's dotted vertical drag guide at [pagePosition]; with a
+  /// non-null [text] the tooltip follows it (tab drags), otherwise only the
+  /// guide is shown (indent/margin drags, like Word).
+  void _showTabFeedback(double pagePosition, String? text) {
     final guide = _tabGuide;
     final tooltip = _tabTooltip;
     final ruler = _hRuler;
@@ -1198,11 +1307,15 @@ class WordRulers {
       ..left = '${x.toStringAsFixed(2)}px'
       ..top = '${top.toStringAsFixed(2)}px'
       ..height = '${math.max(0, viewportRect.bottom - rulerRect.bottom)}px';
+    guide.classList.add('show');
+    if (text == null) {
+      tooltip.classList.remove('show');
+      return;
+    }
     tooltip
       ..textContent = text
       ..style.left = '${(x + 6).toStringAsFixed(2)}px'
       ..style.top = '${math.max(2, rulerRect.top - chromeRect.top - 27)}px';
-    guide.classList.add('show');
     tooltip.classList.add('show');
   }
 
@@ -1278,8 +1391,204 @@ class WordRulers {
     };
   }
 
+  // ------------------------------------------------ modo tabela da régua
+
+  double get _pageZoom {
+    final value = double.tryParse(_pageScale?.style.zoom ?? '');
+    return value != null && value > 0 ? value : 1;
+  }
+
+  ({int position, dynamic node})? _caretTable() {
+    final resolved = view.state.selection.fromRes;
+    for (var depth = resolved.depth; depth > 0; depth--) {
+      final node = resolved.node(depth);
+      if (node.type.name == 'table') {
+        return (position: resolved.before(depth), node: node);
+      }
+    }
+    return null;
+  }
+
+  /// Column boundaries of [tableEl] in page-logical px (the ruler's
+  /// coordinate space), derived from the rendered cell rectangles so
+  /// colspans and both grid/table layouts are handled — the same approach as
+  /// the in-document resizer.
+  List<double>? _tableBoundariesLogical(web.HTMLElement tableEl) {
+    final pageScale = _pageScale;
+    if (pageScale == null) return null;
+    final zoom = _pageZoom;
+    final pageLeft = pageScale.getBoundingClientRect().left;
+    final xs = <double>[];
+    void push(double value) {
+      for (final existing in xs) {
+        if ((existing - value).abs() <= 1.5) return;
+      }
+      xs.add(value);
+    }
+
+    final cells = tableEl.querySelectorAll('tr > td, tr > th');
+    for (var i = 0; i < cells.length; i++) {
+      final cell = cells.item(i);
+      if (cell is! web.HTMLElement) continue;
+      if (cell.closest('table') != tableEl) continue;
+      final rect = cell.getBoundingClientRect();
+      push((rect.left - pageLeft) / zoom);
+      push((rect.right - pageLeft) / zoom);
+    }
+    xs.sort();
+    return xs.length >= 2 ? xs : null;
+  }
+
+  /// Word's `RULER_OBJECT_TYPE_TABLE`: when the caret sits in a table the
+  /// ruler shows a draggable marker on every column boundary.
+  void _positionTableColumns(_RulerGeometry geometry) {
+    final host = _hTableCols;
+    if (host == null || _tableColDrag != null) return;
+    host.textContent = '';
+    final table = _caretTable();
+    _hRuler?.classList.toggle('is-table-mode', table != null);
+    if (table == null || !view.editable) return;
+    final dom = view.nodeDOM(table.position);
+    if (dom is! web.HTMLElement) return;
+    final xs = _tableBoundariesLogical(dom);
+    if (xs == null) return;
+    // Skip the left edge: moving it is table indentation, not column width.
+    for (var index = 1; index < xs.length; index++) {
+      final marker = web.document.createElement('span') as web.HTMLElement;
+      marker
+        ..className = 'tiptap-ruler-table-col'
+        ..setAttribute('data-ruler-table-col', '$index')
+        ..setAttribute('title', 'Mover Coluna da Tabela')
+        ..style.left = '${xs[index].toStringAsFixed(2)}px';
+      host.appendChild(marker);
+    }
+  }
+
+  void _beginTableColDrag(web.PointerEvent event) {
+    if (!view.editable || event.button != 0 || _tableColDrag != null) return;
+    final target = event.target;
+    if (target is! web.Element) return;
+    final marker = target.closest('[data-ruler-table-col]');
+    final table = _caretTable();
+    if (marker is! web.HTMLElement || table == null) return;
+    final boundary =
+        int.tryParse(marker.getAttribute('data-ruler-table-col') ?? '');
+    final dom = view.nodeDOM(table.position);
+    if (boundary == null || boundary < 1 || dom is! web.HTMLElement) return;
+    final xs = _tableBoundariesLogical(dom);
+    if (xs == null || boundary >= xs.length) return;
+    event
+      ..preventDefault()
+      ..stopPropagation();
+    _tableColDrag = _TableColDrag(
+      boundary: boundary,
+      tablePosition: table.position,
+      tableEl: dom,
+      tableLeft: xs.first,
+      tracks: [for (var i = 1; i < xs.length; i++) xs[i] - xs[i - 1]],
+      startX: _clientX(event),
+    );
+    marker.classList.add('is-dragging');
+    _hTrack?.classList.add('tiptap-ruler-dragging');
+    _tableColMoveListener = ((web.Event rawEvent) {
+      if (rawEvent is web.PointerEvent) _updateTableColDrag(rawEvent);
+    }).toJS;
+    _tableColEndListener = ((web.Event rawEvent) {
+      _finishTableColDrag(commit: rawEvent.type == 'pointerup');
+    }).toJS;
+    final windowTarget = web.window as web.EventTarget;
+    windowTarget
+      ..addEventListener('pointermove', _tableColMoveListener)
+      ..addEventListener('pointerup', _tableColEndListener)
+      ..addEventListener('pointercancel', _tableColEndListener);
+  }
+
+  List<double> _tableColTracksFor(_TableColDrag drag, double clientX) {
+    const minimumTrack = 24.0;
+    final delta = (clientX - drag.startX) / _pageZoom;
+    final tracks = List<double>.from(drag.tracks);
+    final index = drag.boundary - 1;
+    if (index >= 0 && index < tracks.length) {
+      tracks[index] = math.max(minimumTrack, tracks[index] + delta);
+    }
+    return tracks;
+  }
+
+  void _updateTableColDrag(web.PointerEvent event) {
+    final drag = _tableColDrag;
+    if (drag == null) return;
+    event.preventDefault();
+    drag.lastClientX = _clientX(event);
+    final tracks = _tableColTracksFor(drag, drag.lastClientX!);
+    final template =
+        tracks.map((w) => '${w.toStringAsFixed(1)}px').join(' ');
+    final rows = drag.tableEl.querySelectorAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows.item(i);
+      if (row is! web.HTMLElement) continue;
+      drag.rememberRow(row);
+      row.style.gridTemplateColumns = template;
+    }
+    var markerX = drag.tableLeft;
+    for (var i = 0; i < drag.boundary && i < tracks.length; i++) {
+      markerX += tracks[i];
+    }
+    final marker = _hTableCols
+        ?.querySelector('[data-ruler-table-col="${drag.boundary}"]');
+    if (marker is web.HTMLElement) {
+      marker.style.left = '${markerX.toStringAsFixed(2)}px';
+    }
+    _showTabFeedback(markerX, null);
+  }
+
+  void _finishTableColDrag({required bool commit}) {
+    final drag = _tableColDrag;
+    if (drag == null) return;
+    final windowTarget = web.window as web.EventTarget;
+    if (_tableColMoveListener != null) {
+      windowTarget.removeEventListener('pointermove', _tableColMoveListener);
+    }
+    if (_tableColEndListener != null) {
+      windowTarget
+        ..removeEventListener('pointerup', _tableColEndListener)
+        ..removeEventListener('pointercancel', _tableColEndListener);
+    }
+    _tableColMoveListener = null;
+    _tableColEndListener = null;
+    _hideTabFeedback();
+    _hTrack?.classList.remove('tiptap-ruler-dragging');
+    _hTableCols
+        ?.querySelector('.is-dragging')
+        ?.classList
+        .remove('is-dragging');
+    for (final (row, style) in drag.previewedRows) {
+      if (style == null) {
+        row.removeAttribute('style');
+      } else {
+        row.setAttribute('style', style);
+      }
+    }
+    final lastPointerX = drag.lastClientX;
+    _tableColDrag = null;
+    if (!commit) {
+      refresh();
+      return;
+    }
+    final tracks = _tableColTracksFor(drag, lastPointerX ?? drag.startX);
+    final node = view.state.doc.nodeAt(drag.tablePosition);
+    if (node == null || node.type.name != 'table') return;
+    final transaction = view.state.tr;
+    applyColumnWidths(
+      transaction,
+      drag.tablePosition,
+      tracks.map((w) => w.round()).toList(),
+    );
+    view.dispatch(transaction);
+  }
+
   ({int position, dynamic node})? _caretTextblock() {
-    final resolved = view.state.selection.headRes;
+    // Word anchors the ruler state on the FIRST paragraph of the selection.
+    final resolved = view.state.selection.fromRes;
     for (var depth = resolved.depth; depth > 0; depth--) {
       final node = resolved.node(depth);
       if (node.isTextblock) {
@@ -1287,6 +1596,28 @@ class WordRulers {
       }
     }
     return null;
+  }
+
+  /// Every textblock intersecting the current selection — the set that ruler
+  /// gestures apply to. With a caret selection this is just the caret block,
+  /// like Word; with a range, dragging an indent marker or a tab stop
+  /// repositions all selected paragraphs.
+  List<({int position, dynamic node})> _selectionTextblocks() {
+    final selection = view.state.selection;
+    final result = <({int position, dynamic node})>[];
+    view.state.doc.nodesBetween(selection.from, selection.to,
+        (node, pos, parent, index) {
+      if (node.isTextblock) {
+        result.add((position: pos, node: node));
+        return false;
+      }
+      return true;
+    });
+    if (result.isEmpty) {
+      final caret = _caretTextblock();
+      if (caret != null) result.add(caret);
+    }
+    return result;
   }
 
   String _px(double value) {
@@ -1364,6 +1695,10 @@ class _IndentDrag {
   final String? originalInlineStyle;
   final double paddingLeft;
   final double paddingRight;
+
+  /// All paragraphs the gesture applies to (the selection's textblocks).
+  /// Word repositions every selected paragraph, not only the caret one.
+  final List<_IndentDragTarget> targets;
   double left;
   double right;
   double first;
@@ -1377,10 +1712,52 @@ class _IndentDrag {
     required this.originalInlineStyle,
     required this.paddingLeft,
     required this.paddingRight,
+    required this.targets,
     required this.left,
     required this.right,
     required this.first,
   });
+}
+
+class _IndentDragTarget {
+  final int position;
+  final Map<String, dynamic> attrs;
+  final web.HTMLElement? dom;
+  final String? inlineStyle;
+
+  const _IndentDragTarget({
+    required this.position,
+    required this.attrs,
+    required this.dom,
+    required this.inlineStyle,
+  });
+}
+
+class _TableColDrag {
+  final int boundary;
+  final int tablePosition;
+  final web.HTMLElement tableEl;
+  final double tableLeft;
+  final List<double> tracks;
+  final double startX;
+  final List<(web.HTMLElement, String?)> previewedRows = [];
+  double? lastClientX;
+
+  _TableColDrag({
+    required this.boundary,
+    required this.tablePosition,
+    required this.tableEl,
+    required this.tableLeft,
+    required this.tracks,
+    required this.startX,
+  });
+
+  void rememberRow(web.HTMLElement row) {
+    for (final entry in previewedRows) {
+      if (entry.$1 == row) return;
+    }
+    previewedRows.add((row, row.getAttribute('style')));
+  }
 }
 
 class _MarginDrag {

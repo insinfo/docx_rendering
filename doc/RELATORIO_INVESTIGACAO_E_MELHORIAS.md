@@ -1107,3 +1107,131 @@ atualizados: eles detectam corretamente diferenças intencionais como os novos
 estilos e a estrutura de cabeçalho/rodapé, não exceções funcionais. As suítes
 Chrome comportamentais e os harnesses Puppeteer permanecem como a validação
 funcional da nova shell, régua, regiões de página, tabelas e tabulações.
+
+### 8.14 Régua reconstruída sobre o algoritmo real do OnlyOffice
+
+A régua foi refeita copiando a geometria do `sdkjs/word/Drawing/Rulers.js`
+(não-minificado), em vez de aproximar por screenshot:
+
+**Escala (`drawLayoutMM`, Rulers.js:557):**
+- banda de 13 px dentro da faixa de 22 px (equivalente a `m_nTop=6..m_nBottom=19`, comprimida para 4..17);
+- fundo em camadas: zona útil `#FFFFFF`, margens `#D9D9D9`, filetes `#CBCBCB` acima/abaixo, chrome ao redor — sem borda nem sombra na faixa;
+- quartos de cm = tick de 3 px, metades = tick de 5 px, ambos centrados; o cm inteiro desenha o número (7pt Arial, `#555`) — inclusive nas margens, contando para fora da fronteira, exatamente como `drawFunc(zeroX, ±step)`;
+- números centralizados verticalmente na banda (correção apontada em uso real).
+
+**Marcadores (`blitFirstInd/blitLeftInd/blitRightInd`, Rulers.js:2420-2494):**
+- SVGs data-URI com preenchimento branco e traço 1 px `#555` (first-line = casinha para baixo com aba acima da banda; hanging = pentágono para cima; caixa do recuo esquerdo compartilhando o traço da base; right = pentágono);
+- o elemento continua um retângulo de 17 px sem `clip-path` — recorte no elemento encolhia o hit-test e cliques perdidos criavam tab stops ("riscos" acumulados na régua);
+- tab stops em L de 2 px pretos (blitTab) apoiados na base da banda.
+
+**Interação:**
+- prioridade do Word ao empilhar controles: tab stop → marcador de recuo → margem → clique na escala cria tab; os marcadores subiram para `z-index` acima do handle de margem;
+- clique que erra um marcador por ≤6 px não cria tab stop;
+- guia pontilhada vertical (a do arrasto de tabs) agora aparece também nos arrastos de recuo e de margem, como no Word;
+- `clientX/clientY` passados a ler via `js_interop_unsafe` em `word_rulers.dart` e `table_resizing.dart` — os getters `int` de package:web lançam com coordenadas fracionárias de pointer (zoom/high-DPI), o que travava `_updateMarginDrag` no build DDC.
+
+**Causa raiz dos marcadores escuros:** `tiptap_word_shell.css` carregava um
+bloco legado da régua (bordas-triângulo `#4b5563`, handles de margem visíveis,
+ticks antigos) que sobrepunha o asset novo; 20 regras legadas foram removidas
+— `tiptap_editor.css` é a única fonte de estilo da régua.
+
+Validação: `dart analyze` limpo; teste browser do PageRegionEditor passou;
+harness Puppeteer do example real passou; close-up 2x da régua conferido
+visualmente contra as capturas do Word (`test/output/ruler_closeup.png`).
+
+### 8.15 Testes de interação humana (page.mouse) na régua
+
+O harness Puppeteer ganhou uma seção que usa `page.mouse.move/down/up` reais —
+diferentemente dos `PointerEvent` sintéticos (que são despachados direto no
+elemento e pulam o hit-testing), estes gestos atravessam o hit-test do browser
+e validam a prioridade Word entre controles empilhados:
+
+1. `elementFromPoint` no centro de um tab stop a 12 px da margem esquerda
+   (dentro da zona estendida do handle de margem) devolve o tab stop;
+2. arrasto humano do tab stop (+120 px) move o tab e `pageMarginLeft`
+   permanece intocado;
+3. arrasto humano do marcador de primeira linha (na fronteira da margem)
+   grava `textIndent` no parágrafo e nunca mexe na margem;
+4. arrasto humano da margem direita numa área livre de marcadores (acima do
+   pentágono do recuo direito) atualiza `pageMarginRight`.
+
+Resultado: os quatro gestos passaram no editor real compilado. As falhas
+relatadas em uso manual eram do build DDC (webdev serve) anterior, que
+travava todo arrasto no crash `clientX int` (§8.14) — após recompilar,
+o comportamento ao vivo coincide com o harness. Durante o arrasto os três
+tipos de controle mostram a guia tracejada vertical e os recuos movem o
+texto em preview ao vivo (estilos inline, commit único no pointerup).
+
+### 8.16 Régua multi-parágrafo, sincronização de seleção e controles de fonte do Word
+
+**Gestos da régua sobre seleções (como no Word):** arrastar um marcador de
+recuo ou um tab stop com vários parágrafos selecionados aplica a mudança a
+TODOS os parágrafos da seleção (`_selectionTextblocks` + alvos múltiplos no
+`_IndentDrag`, preview ao vivo em cada bloco e commit em uma única transação;
+`_setTabStops` idem). A régua ancora seu estado no primeiro parágrafo da
+seleção (`fromRes`), como o Word. O pointerdown da régua agora força
+`domObserver.forceFlush()` — sem isso, uma seleção recém-feita ainda estava na
+fila assíncrona do selectionchange e o gesto via a seleção antiga (mesma
+técnica que a toolbar já usava). Teste novo no harness: seleção real de três
+parágrafos por teclado (Shift+setas) + arrasto humano do recuo esquerdo →
+`marginLeft` nos três blocos; também aguarda a SELEÇÃO DO ESTADO via novo
+`getTiptapSelection` do debug API, não apenas a do DOM.
+`test/tiptap/view/test_selection_sync_browser.dart` cobre a ressincronização
+de seleção após `setDocument` com seleção grande ativa.
+
+**Controles de fonte (Página Inicial → Fonte):**
+- Subscrito/Sobrescrito: marks `subscript`/`superscript` mutuamente
+  exclusivos (`excludes`), botões com estado ativo, export DOCX
+  `<w:vertAlign/>`, round-trip por `sub`/`sup`/`vertical-align`.
+- Menu Aa (Maiúsculas e Minúsculas): frase/minúscula/MAIÚSCULAS/Cada
+  Palavra/aLTERNAR via `transformCaseCommand` (preserva marcas e posições —
+  mesmas larguras; sentence-case atravessa segmentos e reinicia em fronteiras
+  de bloco). 6 testes VM em `test_transform_case.dart`.
+- A↑/A↓ reais (font-increase/decrease) percorrendo o seletor de tamanho.
+- **Paletas de cor do Word** para Cor da Fonte e Realce: Automático, grade de
+  Cores do Tema (10 bases × 5 variantes geradas por tint/shade 80/60/40/25/50),
+  Cores Padrão, e para realce as 15 cores clássicas + Sem Cor; "Mais Cores…"
+  abre o seletor nativo, que continua ligado ao contrato
+  `data-tiptap-control` existente. Aplicar cor usa comandos não-toggle
+  (`setColor`/`setHighlight`); Automático/Sem Cor removem a marca.
+- Ícones Fluent corretos para tudo isso — codepoints extraídos do cmap do
+  WOFF2 vendorado com fontTools (subscript 63495, superscript 63497,
+  change_case 63411, text_color 63424, highlight 62589, font_increase 62522,
+  font_decrease 62520, clear_formatting 63421, copy/cut/paste/search/
+  paint_brush).
+
+**Pendências registradas para a próxima entrega (pedido do usuário):** mini
+UI contextual flutuante de tabela (como a do Word ao lado da tabela), âncoras
+de mover/redimensionar tabela (⊞ no canto superior esquerdo e alça no canto
+inferior direito) e o MODO TABELA da régua — marcadores de fronteira de
+coluna arrastáveis quando o caret está numa tabela
+(`RULER_OBJECT_TYPE_TABLE` do OnlyOffice, Rulers.js:707+, já mapeado).
+
+Validação: `dart analyze` limpo; 39 testes VM (case + tabelas + exportador),
+teste browser de sincronização de seleção, e o harness Puppeteer completo do
+example real passaram.
+
+### 8.17 Modo tabela da régua, âncoras da tabela e mini-UI flutuante
+
+**Modo tabela da régua (Word `RULER_OBJECT_TYPE_TABLE`):** com o caret dentro
+de uma tabela, a régua horizontal materializa um marcador hachurado em cada
+fronteira de coluna (exceto a borda esquerda), em coordenadas lógicas da
+página. Arrastar um marcador mostra a guia pontilhada, faz preview ao vivo
+dos grid tracks das linhas e grava `columnWidths` na tabela e nas linhas em
+uma única transação (`applyColumnWidths`). Prioridade de hit acima de todos
+os demais controles da régua.
+
+**Âncoras da tabela + mini-UI:** o plugin de resize ganhou um overlay
+ancorado em `.page-scale` (coordenadas lógicas; acompanha o zoom via
+MutationObserver): o ⊞ no canto superior esquerdo seleciona a tabela inteira
+(NodeSelection), a alça no canto inferior direito redimensiona a tabela toda
+proporcionalmente, e a barra rápida flutuante acima da tabela expõe
+Linha+/Col+/Linha−/Col−/Mesclar/Dividir/Excluir usando os comandos do motor.
+Correção estrutural importante: tabelas paginadas têm `display:contents` —
+o `<table>` não tem caixa própria; o overlay mede a UNIÃO dos rects dos
+`<tr>` (`_tableBox`).
+
+Validação: harness Puppeteer com gestos humanos — 3 marcadores de coluna ao
+entrar na tabela; arrasto do marcador grava `columnWidths` (primeira coluna
++45px); quickbar insere/exclui linha; ⊞ seleciona a tabela. 56 testes VM e
+7 browser passaram; `dart analyze` limpo.

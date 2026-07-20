@@ -38,6 +38,20 @@ abstract final class TiptapIcons {
     'page-margins': 62374, // document_page_top_center_24_regular
     'orientation': 59552, // orientation_24_regular
     'page-size': 59923, // resize_24_regular
+    // Codepoints extracted from the vendored WOFF2 cmap (fontTools).
+    'subscript': 63495, // text_subscript_24_regular
+    'superscript': 63497, // text_superscript_24_regular
+    'change-case': 63411, // text_change_case_24_regular
+    'text-color': 63424, // text_color_24_regular
+    'highlight': 62589, // highlight_24_regular
+    'clear-formatting': 63421, // text_clear_formatting_24_regular
+    'font-increase': 62522, // font_increase_24_regular
+    'font-decrease': 62520, // font_decrease_24_regular
+    'copy': 62252, // copy_24_regular
+    'cut': 62267, // cut_24_regular
+    'paste': 62166, // clipboard_paste_24_regular
+    'search': 63120, // search_24_regular
+    'paint-brush': 62867, // paint_brush_24_regular
   };
 
   static String markup(String name, {int size = 18}) {

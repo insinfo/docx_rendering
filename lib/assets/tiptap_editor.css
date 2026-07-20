@@ -428,8 +428,8 @@
   font: 9px/1 Arial, sans-serif;
 }
 .tiptap-ui .tiptap-horizontal-ruler .tiptap-ruler-num {
-  bottom: 6px;
-  transform: translateX(-50%);
+  top: 10.5px;
+  transform: translate(-50%, -50%);
 }
 .tiptap-ui .tiptap-horizontal-ruler .tiptap-ruler-tick {
   top: 10.5px;
@@ -442,8 +442,8 @@
   height: 3px;
 }
 .tiptap-ui .tiptap-vertical-ruler .tiptap-ruler-num {
-  right: 6px;
-  transform: translateY(-50%);
+  left: 10.5px;
+  transform: translate(-50%, -50%);
 }
 .tiptap-ui .tiptap-vertical-ruler .tiptap-ruler-tick {
   left: 10.5px;
@@ -457,19 +457,13 @@
 }
 .tiptap-ui .tiptap-ruler-indent {
   position: absolute;
-  z-index: 2;
-  width: 0;
-  height: 0;
+  /* Above the margin handles (4): indent markers take priority when they sit
+     on the margin boundary, exactly like Word. Tab stops stay highest (7). */
+  z-index: 6;
   transform: translateX(-50%);
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .7));
   pointer-events: auto;
   touch-action: none;
   cursor: ew-resize;
-}
-.tiptap-ui .tiptap-ruler-indent::after {
-  content: '';
-  position: absolute;
-  inset: -6px;
 }
 .tiptap-ui .tiptap-ruler-indent:hover,
 .tiptap-ui .tiptap-ruler-indent.is-dragging {
@@ -477,48 +471,54 @@
 }
 .tiptap-ui .tiptap-ruler-dragging { cursor: ew-resize; }
 /* OnlyOffice markers (blitFirstInd/blitLeftInd/blitRightInd,
-   Rulers.js:2420-2494): white fill with a #555 outline, ~9px wide. The
-   outline is the element background; the fill is a ::before clipped by the
-   same polygon, inset by 1px. */
+   Rulers.js:2420-2494): ~9px shapes with white fill and a crisp 1px #555
+   stroke, reproduced as SVG backgrounds. The element itself stays an
+   unclipped 17px rectangle so the pointer target is generous — clip-path
+   would shrink hit-testing to the polygon and stray clicks on the ruler
+   would create tab stops instead of dragging. */
 .tiptap-ui .tiptap-ruler-indent-first,
 .tiptap-ui .tiptap-ruler-indent-hanging,
-.tiptap-ui .tiptap-ruler-indent-right {
-  width: 9px;
-  background: #555555;
+.tiptap-ui .tiptap-ruler-indent-right,
+.tiptap-ui .tiptap-ruler-indent-left {
+  width: 17px;
+  background: transparent;
 }
-.tiptap-ui .tiptap-ruler-indent-first::before,
-.tiptap-ui .tiptap-ruler-indent-hanging::before,
-.tiptap-ui .tiptap-ruler-indent-right::before,
-.tiptap-ui .tiptap-ruler-indent-left::before {
+.tiptap-ui .tiptap-ruler-indent::before {
   content: '';
   position: absolute;
-  inset: 1px;
-  background: #ffffff;
-  clip-path: inherit;
+  left: 4px;
+  width: 9px;
+  background-repeat: no-repeat;
+  background-position: center;
 }
-/* Flat cap 3px above the band top (y 1..4), tip reaching y 10. */
-.tiptap-ui .tiptap-ruler-indent-first {
+/* First line: flat cap above the band (y 1..4), tip pointing down to y 10. */
+.tiptap-ui .tiptap-ruler-indent-first { top: 0; height: 13px; }
+.tiptap-ui .tiptap-ruler-indent-first::before {
   top: 1px;
   height: 9px;
-  clip-path: polygon(0 0, 100% 0, 100% 33%, 50% 100%, 0 33%);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9'%3E%3Cpath d='M0.5 0.5H8.5V3.5L4.5 8.5L0.5 3.5Z' fill='%23fff' stroke='%23555'/%3E%3C/svg%3E");
 }
-/* Pentagon pointing up: tip at y 11, flat bottom on the band bottom (17). */
-.tiptap-ui .tiptap-ruler-indent-hanging {
-  top: 11px;
+/* Hanging: pentagon pointing up, tip at y 11, flat base on the band bottom. */
+.tiptap-ui .tiptap-ruler-indent-hanging { top: 8px; height: 9px; }
+.tiptap-ui .tiptap-ruler-indent-hanging::before {
+  top: 3px;
   height: 6px;
-  clip-path: polygon(50% 0, 100% 50%, 100% 100%, 0 100%, 0 50%);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6'%3E%3Cpath d='M4.5 0.5L8.5 3V5.5H0.5V3Z' fill='%23fff' stroke='%23555'/%3E%3C/svg%3E");
 }
-/* Box hanging below the band (y 17..22), forming Word's combined glyph. */
-.tiptap-ui .tiptap-ruler-indent-left {
-  top: 17px;
-  width: 9px;
-  height: 5px;
-  background: #555555;
-}
-.tiptap-ui .tiptap-ruler-indent-right {
-  top: 11px;
+/* Left indent: box under the pentagon, sharing its stroke (y 16..22) like
+   OnlyOffice's single blitLeftInd path. */
+.tiptap-ui .tiptap-ruler-indent-left { top: 14px; height: 9px; }
+.tiptap-ui .tiptap-ruler-indent-left::before {
+  top: 2px;
   height: 6px;
-  clip-path: polygon(50% 0, 100% 50%, 100% 100%, 0 100%, 0 50%);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6'%3E%3Crect x='0.5' y='0.5' width='8' height='5' fill='%23fff' stroke='%23555'/%3E%3C/svg%3E");
+}
+/* Right indent: same pentagon as hanging, at the right margin. */
+.tiptap-ui .tiptap-ruler-indent-right { top: 8px; height: 9px; }
+.tiptap-ui .tiptap-ruler-indent-right::before {
+  top: 3px;
+  height: 6px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6'%3E%3Cpath d='M4.5 0.5L8.5 3V5.5H0.5V3Z' fill='%23fff' stroke='%23555'/%3E%3C/svg%3E");
 }
 .tiptap-ui .tiptap-pagination-gap {
   border-top: 1px solid var(--tiptap-line);
@@ -586,3 +586,90 @@
   font-size: 1.12em;
   margin-bottom: .7em;
 }
+
+/* Modo tabela da régua (Word RULER_OBJECT_TYPE_TABLE): um marcador
+   arrastável em cada fronteira de coluna quando o caret está na tabela. */
+.tiptap-ui .tiptap-ruler-table-cols {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tiptap-ui .tiptap-ruler-table-col {
+  position: absolute;
+  top: 4px;
+  width: 9px;
+  height: 13px;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  border: 1px solid #8a8a8a;
+  background-color: #e3e5e8;
+  background-image: radial-gradient(circle, #6a6a6a 0 0.9px, transparent 1.1px);
+  background-size: 3px 3.4px;
+  background-position: center;
+  pointer-events: auto;
+  cursor: ew-resize;
+  z-index: 8;
+}
+.tiptap-ui .tiptap-ruler-table-col:hover,
+.tiptap-ui .tiptap-ruler-table-col.is-dragging { border-color: #185abd; }
+
+/* Âncoras e mini-UI flutuante da tabela (Word: ⊞ para selecionar/mover, alça
+   de canto para redimensionar e barra rápida de ações estruturais). */
+.tiptap-ui .tiptap-table-overlay {
+  position: absolute;
+  z-index: 16;
+  pointer-events: none;
+}
+.tiptap-ui .tiptap-table-move {
+  position: absolute;
+  left: -20px;
+  top: -20px;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border: 1px solid #9a9a9a;
+  border-radius: 3px;
+  background: #fff;
+  color: #444;
+  font: 11px/15px sans-serif;
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.tiptap-ui .tiptap-table-move:hover { border-color: #185abd; color: #185abd; }
+.tiptap-ui .tiptap-table-corner {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 9px;
+  height: 9px;
+  border: 1px solid #9a9a9a;
+  background: #fff;
+  cursor: nwse-resize;
+  pointer-events: auto;
+}
+.tiptap-ui .tiptap-table-corner:hover { border-color: #185abd; }
+.tiptap-ui .tiptap-table-quickbar {
+  position: absolute;
+  left: 0;
+  top: -34px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #d6d6d6;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .14);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.tiptap-ui .tiptap-table-quick {
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 7px;
+  background: transparent;
+  color: #202020;
+  font: 11.5px/16px 'Segoe UI', sans-serif;
+  cursor: pointer;
+}
+.tiptap-ui .tiptap-table-quick:hover { background: #eef4fb; color: #185abd; }

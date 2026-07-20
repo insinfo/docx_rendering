@@ -6,6 +6,7 @@ export 'dropcursor.dart';
 export 'italic.dart';
 export 'heading.dart';
 export 'strike.dart';
+export 'subscript.dart';
 export 'underline.dart';
 export 'code.dart';
 export 'link.dart';

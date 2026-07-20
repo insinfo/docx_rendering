@@ -7,7 +7,7 @@ import 'package:web/web.dart' as web;
 import '../../prosemirror/state/index.dart';
 import '../../prosemirror/view/index.dart';
 import '../core/extension.dart';
-import 'table_commands.dart' show applyColumnWidths;
+import 'table_commands.dart';
 
 /// Interactive column/row resizing for tables, in the spirit of
 /// prosemirror-tables' columnResizing plugin adapted to this package's
@@ -42,13 +42,42 @@ class TableResizingExtension extends Extension {
               minRowHeight: minRowHeight,
             );
             return PluginView(
-              update: (view, previousState) =>
-                  resizer.view = view as EditorView,
+              update: (view, previousState) {
+                resizer.view = view as EditorView;
+                resizer.syncOverlay();
+              },
               destroy: resizer.destroy,
             );
           },
         )),
       ];
+}
+
+class _CornerDrag {
+  final int tablePosition;
+  final web.HTMLElement tableEl;
+  final double startX;
+  final double startWidth;
+  final double zoom;
+  final List<double> tracks;
+  final List<(web.HTMLElement, String?)> previewedRows = [];
+  double? lastClientX;
+
+  _CornerDrag({
+    required this.tablePosition,
+    required this.tableEl,
+    required this.startX,
+    required this.startWidth,
+    required this.zoom,
+    required this.tracks,
+  });
+
+  void rememberRow(web.HTMLElement row) {
+    for (final entry in previewedRows) {
+      if (entry.$1 == row) return;
+    }
+    previewedRows.add((row, row.getAttribute('style')));
+  }
 }
 
 /// Pointer coordinates can be fractional (zoom, high-DPI); package:web types
@@ -100,11 +129,293 @@ class _TableResizer {
 
   void destroy() {
     _abortDrag();
+    _overlay?.remove();
+    _overlay = null;
+    _zoomObserver?.disconnect();
+    _zoomObserver = null;
     for (final entry in _listeners) {
       entry.target.removeEventListener(entry.type, entry.listener, true.toJS);
       entry.target.removeEventListener(entry.type, entry.listener);
     }
     _listeners.clear();
+  }
+
+  // ------------------------------------------- âncoras + mini UI da tabela
+
+  web.HTMLElement? _overlay;
+  web.MutationObserver? _zoomObserver;
+  int? _overlayTablePos;
+  _CornerDrag? _cornerDrag;
+
+  ({int position, dynamic node})? _caretTable() {
+    final resolved = view.state.selection.fromRes;
+    for (var depth = resolved.depth; depth > 0; depth--) {
+      final node = resolved.node(depth);
+      if (node.type.name == 'table') {
+        return (position: resolved.before(depth), node: node);
+      }
+    }
+    // A NodeSelection on the table itself also counts.
+    final selection = view.state.selection;
+    final at = view.state.doc.nodeAt(selection.from);
+    if (at != null && at.type.name == 'table') {
+      return (position: selection.from, node: at);
+    }
+    return null;
+  }
+
+  /// Word's table chrome: the ⊞ move/select anchor at the top-left corner,
+  /// the resize square at the bottom-right and a floating quick toolbar with
+  /// the common structural actions.
+  void syncOverlay() {
+    if (_cornerDrag != null) return;
+    final host = view.dom.closest('.page-scale');
+    final table = view.editable ? _caretTable() : null;
+    if (host is! web.HTMLElement || table == null) {
+      _overlay?.remove();
+      _overlay = null;
+      _overlayTablePos = null;
+      return;
+    }
+    final tableDom = view.nodeDOM(table.position);
+    if (tableDom is! web.HTMLElement) {
+      _overlay?.remove();
+      _overlay = null;
+      return;
+    }
+    var overlay = _overlay;
+    if (overlay == null || overlay.parentElement != host) {
+      overlay?.remove();
+      overlay = _buildOverlay();
+      host.appendChild(overlay);
+      _overlay = overlay;
+      _observeZoom(host);
+    }
+    _overlayTablePos = table.position;
+    final hostRect = host.getBoundingClientRect();
+    // Paginated top-level tables render with display:contents — the <table>
+    // element has no box of its own, so measure the union of its rows.
+    final tableRect = _tableBox(tableDom) ?? tableDom.getBoundingClientRect();
+    final zoom = _scaleOf(host, hostRect);
+    overlay.style
+      ..left = '${((tableRect.left - hostRect.left) / zoom).toStringAsFixed(1)}px'
+      ..top = '${((tableRect.top - hostRect.top) / zoom).toStringAsFixed(1)}px'
+      ..width = '${(tableRect.width / zoom).toStringAsFixed(1)}px'
+      ..height = '${(tableRect.height / zoom).toStringAsFixed(1)}px';
+  }
+
+  web.DOMRect? _tableBox(web.HTMLElement tableDom) {
+    final rows = tableDom.querySelectorAll('tr');
+    double? left, top, right, bottom;
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows.item(i);
+      if (row is! web.HTMLElement) continue;
+      if (row.closest('table') != tableDom) continue;
+      final rect = row.getBoundingClientRect();
+      if (rect.width == 0 && rect.height == 0) continue;
+      left = left == null ? rect.left : math.min(left, rect.left);
+      top = top == null ? rect.top : math.min(top, rect.top);
+      right = right == null ? rect.right : math.max(right, rect.right);
+      bottom = bottom == null ? rect.bottom : math.max(bottom, rect.bottom);
+    }
+    if (left == null || top == null || right == null || bottom == null) {
+      return null;
+    }
+    return web.DOMRect(left, top, right - left, bottom - top);
+  }
+
+  void _observeZoom(web.HTMLElement host) {
+    _zoomObserver?.disconnect();
+    _zoomObserver = web.MutationObserver(
+      ((JSArray<web.MutationRecord> records, web.MutationObserver observer) {
+        syncOverlay();
+      }).toJS,
+    )..observe(
+        host,
+        web.MutationObserverInit(attributes: true),
+      );
+  }
+
+  web.HTMLElement _buildOverlay() {
+    final overlay = web.document.createElement('div') as web.HTMLElement;
+    overlay
+      ..className = 'tiptap-table-overlay'
+      ..setAttribute('contenteditable', 'false')
+      ..setAttribute('aria-hidden', 'true');
+
+    final move = web.document.createElement('button') as web.HTMLElement;
+    move
+      ..className = 'tiptap-table-move'
+      ..setAttribute('type', 'button')
+      ..setAttribute('title', 'Selecionar Tabela')
+      ..setAttribute('data-table-anchor', 'move')
+      ..textContent = '⠿';
+    move.addEventListener(
+        'mousedown', ((web.Event event) => event.preventDefault()).toJS);
+    move.addEventListener(
+        'click',
+        (web.Event event) {
+          event.preventDefault();
+          final position = _overlayTablePos;
+          if (position == null) return;
+          final node = view.state.doc.nodeAt(position);
+          if (node == null || node.type.name != 'table') return;
+          final tr = view.state.tr;
+          tr.setSelection(NodeSelection.create(view.state.doc, position));
+          view.dispatch(tr);
+          view.focus();
+        }.toJS);
+
+    final resize = web.document.createElement('span') as web.HTMLElement;
+    resize
+      ..className = 'tiptap-table-corner'
+      ..setAttribute('title', 'Redimensionar Tabela')
+      ..setAttribute('data-table-anchor', 'resize');
+    resize.addEventListener(
+        'pointerdown',
+        ((web.Event event) {
+          if (event is web.PointerEvent) _beginCornerDrag(event);
+        }).toJS);
+
+    final bar = web.document.createElement('div') as web.HTMLElement;
+    bar.className = 'tiptap-table-quickbar';
+    for (final item in const [
+      ('row-below', 'Linha+', 'Inserir Linha Abaixo'),
+      ('col-right', 'Col+', 'Inserir Coluna à Direita'),
+      ('del-row', 'Linha−', 'Excluir Linha'),
+      ('del-col', 'Col−', 'Excluir Coluna'),
+      ('merge', 'Mesclar', 'Mesclar Células'),
+      ('split', 'Dividir', 'Dividir Célula'),
+      ('del-table', '✕', 'Excluir Tabela'),
+    ]) {
+      final button = web.document.createElement('button') as web.HTMLElement;
+      button
+        ..className = 'tiptap-table-quick'
+        ..setAttribute('type', 'button')
+        ..setAttribute('title', item.$3)
+        ..setAttribute('data-table-quick', item.$1)
+        ..textContent = item.$2;
+      button.addEventListener(
+          'mousedown', ((web.Event event) => event.preventDefault()).toJS);
+      button.addEventListener(
+          'click',
+          (web.Event event) {
+            event.preventDefault();
+            _runQuickAction(item.$1);
+          }.toJS);
+      bar.appendChild(button);
+    }
+
+    overlay
+      ..appendChild(move)
+      ..appendChild(resize)
+      ..appendChild(bar);
+    return overlay;
+  }
+
+  void _runQuickAction(String action) {
+    void dispatchTr(Transaction tr) => view.dispatch(tr);
+    final command = switch (action) {
+      'row-below' => addRowCommand(before: false),
+      'col-right' => addColumnCommand(before: false),
+      'del-row' => deleteRowCommand(),
+      'del-col' => deleteColumnCommand(),
+      'merge' => mergeCellsCommand(),
+      'split' => splitCellCommand(),
+      'del-table' => deleteTableCommand(),
+      _ => null,
+    };
+    if (command == null) return;
+    command(view.state, dispatchTr, view);
+    view.focus();
+  }
+
+  void _beginCornerDrag(web.PointerEvent event) {
+    if (!view.editable || _cornerDrag != null) return;
+    final position = _overlayTablePos;
+    if (position == null) return;
+    final tableDom = view.nodeDOM(position);
+    final host = view.dom.closest('.page-scale');
+    if (tableDom is! web.HTMLElement || host is! web.HTMLElement) return;
+    event
+      ..preventDefault()
+      ..stopPropagation();
+    final tableRect = _tableBox(tableDom) ?? tableDom.getBoundingClientRect();
+    final zoom = _scaleOf(host, host.getBoundingClientRect());
+    final boundaries = _columnBoundaries(tableDom);
+    if (boundaries.length < 2) return;
+    _cornerDrag = _CornerDrag(
+      tablePosition: position,
+      tableEl: tableDom,
+      startX: _pointerX(event),
+      startWidth: tableRect.width / zoom,
+      zoom: zoom,
+      tracks: [
+        for (var i = 1; i < boundaries.length; i++)
+          boundaries[i] - boundaries[i - 1]
+      ],
+    );
+    _listen(web.document, 'pointermove', _onCornerMove);
+    _listen(web.document, 'pointerup', _onCornerEnd);
+    _listen(web.document, 'pointercancel', _onCornerEnd);
+  }
+
+  List<double> _cornerTracksFor(_CornerDrag drag, double clientX) {
+    final delta = (clientX - drag.startX) / drag.zoom;
+    final factor =
+        ((drag.startWidth + delta) / drag.startWidth).clamp(0.2, 5.0);
+    return [
+      for (final track in drag.tracks) math.max(24.0, track * factor)
+    ];
+  }
+
+  void _onCornerMove(web.Event event) {
+    final drag = _cornerDrag;
+    if (drag == null || event is! web.PointerEvent) return;
+    event.preventDefault();
+    drag.lastClientX = _pointerX(event);
+    final tracks = _cornerTracksFor(drag, drag.lastClientX!);
+    final template =
+        tracks.map((w) => '${w.toStringAsFixed(1)}px').join(' ');
+    final rows = drag.tableEl.querySelectorAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows.item(i);
+      if (row is! web.HTMLElement) continue;
+      drag.rememberRow(row);
+      row.style.gridTemplateColumns = template;
+    }
+  }
+
+  void _onCornerEnd(web.Event event) {
+    final drag = _cornerDrag;
+    if (drag == null) return;
+    for (final (row, style) in drag.previewedRows) {
+      if (style == null) {
+        row.removeAttribute('style');
+      } else {
+        row.setAttribute('style', style);
+      }
+    }
+    _listeners.removeWhere((entry) {
+      if (entry.target == web.document) {
+        entry.target.removeEventListener(entry.type, entry.listener);
+        return true;
+      }
+      return false;
+    });
+    _cornerDrag = null;
+    if (event.type != 'pointerup') {
+      syncOverlay();
+      return;
+    }
+    final tracks =
+        _cornerTracksFor(drag, drag.lastClientX ?? drag.startX);
+    final node = view.state.doc.nodeAt(drag.tablePosition);
+    if (node == null || node.type.name != 'table') return;
+    final tr = view.state.tr;
+    applyColumnWidths(
+        tr, drag.tablePosition, tracks.map((w) => w.round()).toList());
+    view.dispatch(tr);
   }
 
   void _listen(web.EventTarget target, String type,

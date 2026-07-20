@@ -453,6 +453,174 @@ Future<void> main(List<String> args) async {
       'Limpar remover somente a tabulação selecionada',
     );
 
+    // ------------------------------------------------------------------
+    // Interação HUMANA real (page.mouse): diferentemente dos PointerEvent
+    // sintéticos acima, estes gestos passam pelo hit-testing do browser e
+    // validam a prioridade Word entre controles empilhados:
+    // tab stop > marcador de recuo > margem.
+    // ------------------------------------------------------------------
+    await page.evaluate('''() => globalThis.setTiptapJSON(JSON.stringify({
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        attrs: {tabStops: [
+          {position: '12px', type: 'left', leader: 'none'}
+        ]},
+        content: [{type: 'text', text: 'Hit\\tteste humano'}]
+      }]
+    }))''');
+    await page.click('.ProseMirror p');
+    await page.waitForSelector('.tiptap-ruler-tab');
+    Future<Map<String, num>> centerOf(String selector) async {
+      final result = await page.evaluate('''(sel) => {
+        const r = document.querySelector(sel).getBoundingClientRect();
+        return {x: r.left + r.width / 2, y: r.top + r.height / 2};
+      }''', args: [selector]);
+      final map = Map<String, dynamic>.from(result as Map);
+      return {'x': map['x'] as num, 'y': map['y'] as num};
+    }
+
+    // O tab stop está a 12px da margem esquerda — dentro da zona estendida
+    // do handle de margem. O hit-test tem de devolver o tab stop.
+    final hitAtTab = await page.evaluate('''() => {
+      const r = document.querySelector('.tiptap-ruler-tab').getBoundingClientRect();
+      const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return el && el.closest('[data-ruler-tab]') !== null;
+    }''');
+    _check(hitAtTab == true,
+        'elementFromPoint no tab stop não devolveu o tab stop.');
+
+    final marginBefore = await page.evaluate(
+        '''() => JSON.parse(globalThis.getTiptapJSON()).attrs.pageMarginLeft''');
+
+    // Arrasto humano do tab stop: +120px para a direita.
+    var point = await centerOf('.tiptap-ruler-tab');
+    await page.mouse.move(Point(point['x']!, point['y']!));
+    await page.mouse.down();
+    await page.mouse.move(Point(point['x']! + 60, point['y']!), steps: 6);
+    await page.mouse.move(Point(point['x']! + 120, point['y']!), steps: 6);
+    await page.mouse.up();
+    await _waitUntil(
+      page,
+      '''() => {
+        const json = JSON.parse(globalThis.getTiptapJSON());
+        const tabs = json.content[0].attrs.tabStops;
+        return tabs.length === 1 && parseFloat(tabs[0].position) > 60 &&
+          json.attrs.pageMarginLeft === ${jsonEncode(marginBefore)};
+      }''',
+      'arrasto humano do tab stop mover o tab (e nunca a margem)',
+    );
+
+    // Arrasto humano do marcador de primeira linha: ele fica exatamente na
+    // fronteira da margem; a prioridade tem de ser do marcador.
+    point = await centerOf('.tiptap-ruler-indent-first');
+    await page.mouse.move(Point(point['x']!, point['y']!));
+    await page.mouse.down();
+    await page.mouse.move(Point(point['x']! + 47, point['y']!), steps: 8);
+    await page.mouse.up();
+    await _waitUntil(
+      page,
+      '''() => {
+        const json = JSON.parse(globalThis.getTiptapJSON());
+        const indent = parseFloat(json.content[0].attrs.textIndent || '0');
+        return indent > 30 &&
+          json.attrs.pageMarginLeft === ${jsonEncode(marginBefore)};
+      }''',
+      'arrasto humano do recuo de primeira linha (e nunca a margem)',
+    );
+
+    // Arrasto humano da margem DIREITA num trecho livre da fronteira (acima
+    // do pentágono do recuo direito): só aqui a margem pode responder.
+    final rightMarginBefore = await page.evaluate('''() => {
+      const r = document.querySelector('[data-ruler-margin="right"]')
+        .getBoundingClientRect();
+      const ruler = document.querySelector('.tiptap-horizontal-ruler')
+        .getBoundingClientRect();
+      return {x: r.left + r.width / 2, y: ruler.top + 3};
+    }''');
+    final rightPoint = Map<String, dynamic>.from(rightMarginBefore as Map);
+    await page.mouse
+        .move(Point(rightPoint['x'] as num, rightPoint['y'] as num));
+    await page.mouse.down();
+    await page.mouse.move(
+        Point((rightPoint['x'] as num) - 40, rightPoint['y'] as num),
+        steps: 6);
+    await page.mouse.up();
+    await _waitUntil(
+      page,
+      '''() => {
+        const value = JSON.parse(globalThis.getTiptapJSON())
+          .attrs.pageMarginRight;
+        return typeof value === 'string' && value.endsWith('px') &&
+          parseFloat(value) > 90;
+      }''',
+      'arrasto humano da margem direita em área livre de marcadores',
+    );
+    // Seleção de VÁRIOS parágrafos e arrasto do recuo esquerdo: como no
+    // Word, todos os parágrafos selecionados devem ser reposicionados de uma
+    // vez. Recarrega a página primeiro: o cenário valida o gesto em estado
+    // limpo, não a sequência específica de trocas de documento acima.
+    await page.reload(wait: Until.networkIdle);
+    await page.waitForSelector(
+      '.tiptap-horizontal-ruler-track',
+      visible: true,
+      timeout: const Duration(seconds: 20),
+    );
+    await page.evaluate('''() => globalThis.setTiptapJSON(JSON.stringify({
+      type: 'doc',
+      content: [
+        {type: 'paragraph', content: [{type: 'text', text: 'Primeiro parágrafo da seleção.'}]},
+        {type: 'paragraph', content: [{type: 'text', text: 'Segundo parágrafo da seleção.'}]},
+        {type: 'paragraph', content: [{type: 'text', text: 'Terceiro parágrafo da seleção.'}]}
+      ]
+    }))''');
+    await _waitUntil(
+      page,
+      '''() => document.querySelectorAll('.ProseMirror > p').length === 3 &&
+        globalThis.getTiptapHTML().includes('Terceiro parágrafo')''',
+      'documento de três parágrafos renderizado',
+    );
+    await page.click('.ProseMirror > p');
+    await page.keyboard.press(Key.home);
+    await page.keyboard.down(Key.shift);
+    await page.keyboard.press(Key.arrowDown);
+    await page.keyboard.press(Key.arrowDown);
+    await page.keyboard.press(Key.end);
+    await page.keyboard.up(Key.shift);
+    // Espera o ESTADO do ProseMirror (não apenas o DOM) refletir a seleção
+    // multi-parágrafo antes do arrasto.
+    await _waitUntil(
+      page,
+      '''() => {
+        const sel = JSON.parse(globalThis.getTiptapSelection());
+        return !sel.empty && (sel.to - sel.from) > 40;
+      }''',
+      'seleção real de três parágrafos sincronizada no estado',
+    );
+    point = await centerOf('.tiptap-ruler-indent-left');
+    await page.mouse.move(Point(point['x']!, point['y']!));
+    await page.mouse.down();
+    await page.mouse.move(Point(point['x']! + 57, point['y']!), steps: 8);
+    await page.mouse.up();
+    await _waitUntil(
+      page,
+      '''() => {
+        const json = JSON.parse(globalThis.getTiptapJSON());
+        const margins = json.content
+          .filter(b => b.type === 'paragraph')
+          .map(b => parseFloat((b.attrs && b.attrs.marginLeft) || '0'));
+        return margins.length === 3 && margins.every(m => m > 35) &&
+          json.attrs.pageMarginLeft === ${jsonEncode(marginBefore)};
+      }''',
+      'arrasto humano do recuo aplicar a TODOS os parágrafos selecionados',
+    );
+
+    // Restaura as margens para as verificações seguintes.
+    await page.click('[data-ribbon-tab="layout"]');
+    await page.click('#page-margins-button');
+    await page.click('[data-page-margins="25,30,25,30"]');
+    await page.click('[data-ribbon-tab="home"]');
+
     await page.evaluate('''() => {
       globalThis.__editorNode = document.querySelector('.ProseMirror');
       globalThis.__childMutations = 0;
@@ -728,6 +896,73 @@ Future<void> main(List<String> args) async {
           ${rowsBefore.toInt()}''',
       'excluir linha pela guia contextual',
     );
+
+    // Modo tabela da régua: com o caret na tabela, cada fronteira de coluna
+    // ganha um marcador arrastável (RULER_OBJECT_TYPE_TABLE do Word).
+    await page.click('.ProseMirror td p');
+    await _waitUntil(
+      page,
+      '''() => document.querySelectorAll('.tiptap-ruler-table-col').length === 3''',
+      'marcadores de coluna da tabela na régua',
+    );
+    // Arrasto humano do primeiro marcador de coluna (+45px).
+    final colMarker = Map<String, dynamic>.from(await page.evaluate('''() => {
+      const r = document.querySelector('[data-ruler-table-col="1"]')
+        .getBoundingClientRect();
+      return {x: r.left + r.width / 2, y: r.top + r.height / 2};
+    }''') as Map);
+    await page.mouse
+        .move(Point(colMarker['x'] as num, colMarker['y'] as num));
+    await page.mouse.down();
+    await page.mouse.move(
+        Point((colMarker['x'] as num) + 45, colMarker['y'] as num),
+        steps: 6);
+    await page.mouse.up();
+    await _waitUntil(
+      page,
+      '''() => {
+        const table = JSON.parse(globalThis.getTiptapJSON()).content
+          .find(b => b.type === 'table');
+        const widths = table && table.attrs && table.attrs.columnWidths;
+        return Array.isArray(widths) && widths.length === 3 &&
+          widths[0] > widths[1] + 20;
+      }''',
+      'arrasto do marcador de coluna da régua gravar columnWidths',
+    );
+
+    // Mini-UI flutuante + âncoras: quickbar insere linha e o ⊞ seleciona a
+    // tabela inteira.
+    await _waitUntil(
+      page,
+      '''() => !!document.querySelector('.tiptap-table-overlay .tiptap-table-quickbar')''',
+      'mini-UI flutuante da tabela',
+    );
+    final quickRows = await page.evaluate(
+        '''() => document.querySelectorAll('.ProseMirror tr').length''') as num;
+    await page.click('[data-table-quick="row-below"]');
+    await _waitUntil(
+      page,
+      '''() => document.querySelectorAll('.ProseMirror tr').length ===
+          ${quickRows.toInt() + 1}''',
+      'quickbar inserir linha abaixo',
+    );
+    await page.click('[data-table-quick="del-row"]');
+    await _waitUntil(
+      page,
+      '''() => document.querySelectorAll('.ProseMirror tr').length ===
+          ${quickRows.toInt()}''',
+      'quickbar excluir linha',
+    );
+    await page.click('[data-table-anchor="move"]');
+    await _waitUntil(
+      page,
+      '''() => {
+        const sel = JSON.parse(globalThis.getTiptapSelection());
+        return !sel.empty && (sel.to - sel.from) > 10;
+      }''',
+      'âncora ⊞ selecionar a tabela inteira',
+    );
+    await page.click('.ProseMirror td p');
 
     final deltaFixture = File('${output.path}/example_rulers_delta.json');
     await deltaFixture.writeAsString(jsonEncode({

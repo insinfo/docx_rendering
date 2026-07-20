@@ -34,6 +34,113 @@ Command setTextAlignCommand(List<String> typeNames, String? alignment) {
   };
 }
 
+/// Word's "Maiúsculas e Minúsculas" (Aa) transforms. [mode] is one of
+/// `sentence` | `lower` | `upper` | `title` | `toggle`. Text length is
+/// preserved, so marks and positions survive untouched.
+Command transformCaseCommand(String mode) {
+  return (state, [dispatch, view]) {
+    final selection = state.selection;
+    if (selection.from == selection.to) return false;
+
+    final segments = <({int from, int to, String text, List<Mark> marks})>[];
+    state.doc.nodesBetween(selection.from, selection.to,
+        (node, pos, parent, index) {
+      final text = node.text;
+      if (!node.isText || text == null) return true;
+      final start = pos, end = pos + text.length;
+      final from = start < selection.from ? selection.from : start;
+      final to = end > selection.to ? selection.to : end;
+      if (from < to) {
+        segments.add((
+          from: from,
+          to: to,
+          text: text.substring(from - start, to - start),
+          marks: node.marks,
+        ));
+      }
+      return true;
+    });
+    if (segments.isEmpty) return false;
+    if (dispatch == null) return true;
+
+    final letter = RegExp(r'[\p{L}\p{N}]', unicode: true);
+    // Sentence state flows across segments; a segment gap (block boundary)
+    // also starts a new sentence.
+    var sentenceStart = true;
+    var wordStart = true;
+    int? previousEnd;
+    String transform(String text, {required bool segmentGap}) {
+      if (segmentGap) {
+        sentenceStart = true;
+        wordStart = true;
+      }
+      final buffer = StringBuffer();
+      for (final rune in text.runes) {
+        var char = String.fromCharCode(rune);
+        final isLetter = letter.hasMatch(char);
+        switch (mode) {
+          case 'lower':
+            char = char.toLowerCase();
+          case 'upper':
+            char = char.toUpperCase();
+          case 'toggle':
+            final lower = char.toLowerCase();
+            char = char == lower ? char.toUpperCase() : lower;
+          case 'title':
+            if (isLetter) {
+              char = wordStart ? char.toUpperCase() : char.toLowerCase();
+            }
+          case 'sentence':
+            if (isLetter) {
+              char = sentenceStart ? char.toUpperCase() : char.toLowerCase();
+            }
+        }
+        if (isLetter) {
+          sentenceStart = false;
+          wordStart = false;
+        } else {
+          wordStart = true;
+          if (char == '.' || char == '!' || char == '?' || char == '\n') {
+            sentenceStart = true;
+          }
+        }
+        buffer.write(char);
+      }
+      return buffer.toString();
+    }
+
+    final replacements = <({int from, int to, String text, List<Mark> marks})>[];
+    for (final segment in segments) {
+      final gap = previousEnd != null && segment.from != previousEnd;
+      replacements.add((
+        from: segment.from,
+        to: segment.to,
+        text: transform(segment.text, segmentGap: gap),
+        marks: segment.marks,
+      ));
+      previousEnd = segment.to;
+    }
+
+    final tr = state.tr;
+    for (final replacement in replacements.reversed) {
+      if (replacement.text ==
+          state.doc.textBetween(replacement.from, replacement.to)) {
+        continue;
+      }
+      tr.replaceWith(
+        replacement.from,
+        replacement.to,
+        state.schema.text(replacement.text, replacement.marks),
+      );
+    }
+    if (tr.steps.isEmpty) return false;
+    tr.setSelection(
+        TextSelection.create(tr.doc, selection.from, selection.to));
+    dispatch(tr);
+    return true;
+  };
+}
+
 /// Inserts the given node at the selection, replacing it.
 Command insertNodeCommand(PMNode node) {
   return (state, [dispatch, view]) {

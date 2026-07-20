@@ -155,8 +155,16 @@ class TiptapToolbarController {
         chain.toggleUnderline();
       case 'strike':
         chain.toggleStrike();
+      case 'subscript':
+        chain.toggleSubscript();
+      case 'superscript':
+        chain.toggleSuperscript();
       case 'code':
         chain.toggleCode();
+      case 'font-grow':
+      case 'font-shrink':
+        _stepFontSize(command == 'font-grow' ? 1 : -1);
+        return true;
       case 'bulletList':
         chain.toggleBulletList();
       case 'orderedList':
@@ -219,6 +227,8 @@ class TiptapToolbarController {
       'italic': editor.isActive('italic'),
       'underline': editor.isActive('underline'),
       'strike': editor.isActive('strike'),
+      'subscript': editor.isActive('subscript'),
+      'superscript': editor.isActive('superscript'),
       'code': editor.isActive('code'),
       'bulletList': editor.isActive('bulletList'),
       'orderedList': editor.isActive('orderedList'),
@@ -247,6 +257,17 @@ class TiptapToolbarController {
         blockStyle.value = 'paragraph';
       }
     }
+  }
+
+  /// Word's A↑/A↓: walks the font-size select through its options and applies
+  /// the neighbouring size to the selection.
+  void _stepFontSize(int direction) {
+    final select = root.querySelector('[data-tiptap-control="font-size"]');
+    if (select is! web.HTMLSelectElement) return;
+    final index = select.selectedIndex + direction;
+    if (index < 0 || index >= select.length) return;
+    select.selectedIndex = index;
+    editor.chain.focus().setFontSize('${select.value}px').run();
   }
 
   bool _alignmentActive(String value) =>

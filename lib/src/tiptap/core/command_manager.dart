@@ -51,6 +51,28 @@ class CommandManager {
   CommandManager toggleHighlight([String? color]) =>
       _toggleMark('highlight', color != null ? {'color': color} : null);
 
+  /// Removes the highlight mark from the selection ("Sem Cor" in Word).
+  CommandManager unsetHighlight() {
+    _commands.add(unsetMarkCommand('highlight'));
+    return this;
+  }
+
+  /// Applies (never toggles) the highlight color, like Word's palette.
+  CommandManager setHighlight(String color) {
+    _commands.add(updateMarkAttrsCommand('highlight', {'color': color}));
+    return this;
+  }
+
+  CommandManager toggleSubscript() => _toggleMark('subscript');
+
+  CommandManager toggleSuperscript() => _toggleMark('superscript');
+
+  /// Word's Aa menu: `sentence` | `lower` | `upper` | `title` | `toggle`.
+  CommandManager transformCase(String mode) {
+    _commands.add(transformCaseCommand(mode));
+    return this;
+  }
+
   CommandManager setLink(String href, {String? title, String? target}) {
     _commands.add(setMarkCommand(
         'link', {'href': href, 'title': title, 'target': target}));

@@ -226,6 +226,12 @@ class _DocumentWriter {
         case 'strike':
           props.write('<w:strike/>');
           break;
+        case 'subscript':
+          props.write('<w:vertAlign w:val="subscript"/>');
+          break;
+        case 'superscript':
+          props.write('<w:vertAlign w:val="superscript"/>');
+          break;
         case 'code':
           props.write('<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>');
           break;
