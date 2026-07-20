@@ -93,6 +93,7 @@ class DocxImporter {
       'pageMarginHeader': margins?.header,
       'pageMarginFooter': margins?.footer,
       'pageMarginGutter': margins?.gutter,
+      'defaultTabStop': docx.settingsPart?.settings?.defaultTabStop,
       'sourcePageCount': docx.extendedPropsPart?.props?.pages,
       'headers': _headers,
       'footers': _footers,
@@ -678,6 +679,14 @@ class DocxImporter {
       'marginBottom': paragraphStyle['margin-bottom'] ?? '0',
       'marginLeft': paragraphStyle['margin-left'],
       'textIndent': paragraphStyle['text-indent'],
+      'tabStops': elem.tabs
+          ?.where((tab) => tab.position != null && tab.style != 'clear')
+          .map((tab) => {
+                'position': tab.position,
+                'type': tab.style ?? 'left',
+                'leader': tab.leader ?? 'none',
+              })
+          .toList(),
       'lineHeight': paragraphStyle['line-height'] ?? 'normal',
       'fontFamily': firstInlineStyle('fontFamily') ?? inlineBase['font-family'],
       'fontSize': firstInlineStyle('fontSize') ?? inlineBase['font-size'],

@@ -4,6 +4,7 @@ library;
 import 'dart:js_interop';
 
 import 'package:docx_rendering/tiptap.dart';
+import 'package:docx_rendering/src/prosemirror/state/index.dart';
 import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
 
@@ -18,11 +19,23 @@ void main() {
         .tiptap-ui .ProseMirror p { margin: 0; }
         .tiptap-ui .tiptap-pagination, .tiptap-ui .tiptap-page-break { height: 0; margin: 0; pointer-events: none; }
         .tiptap-ui .tiptap-page-header, .tiptap-ui .tiptap-page-footer { pointer-events: auto; }
-        .tiptap-ui .tiptap-page-editor-overlay { position:absolute;left:0;right:0;bottom:0;border-top:2px dashed #6d5dfc;z-index:40; }
-        .tiptap-ui .tiptap-page-object-selection { position:absolute;border:2px solid #6d5dfc;z-index:50;pointer-events:none; }
+        .tiptap-ui .tiptap-page-region-active { isolation:isolate; }
+        .tiptap-ui .tiptap-page-editor-overlay { position:absolute;left:0;right:0;bottom:0;border-top:2px dashed #6d5dfc;z-index:2147483646; }
+        .tiptap-ui .tiptap-page-object-selection { position:absolute;border:2px solid #6d5dfc;z-index:2147483645;pointer-events:none; }
         .tiptap-ui .tiptap-object-handle { position:absolute;width:8px;height:8px;pointer-events:auto; }
-        .tiptap-ui .tiptap-vertical-ruler { position:absolute;left:8px;top:8px;width:22px;height:0;overflow:visible; }
-        .tiptap-ui .tiptap-vertical-ruler::before { content:'';position:absolute;width:22px;height:540px; }
+        .tiptap-ui .tiptap-vertical-ruler-track { position:absolute;width:22px;overflow:hidden; }
+        .tiptap-ui .tiptap-vertical-ruler { position:absolute;box-sizing:border-box;width:22px;overflow:hidden;transform-origin:top left; }
+        .tiptap-ui .tiptap-horizontal-ruler-track { position:relative;height:22px;overflow:hidden; }
+        .tiptap-ui .tiptap-horizontal-ruler-center { position:absolute;top:0;width:fit-content; }
+        .tiptap-ui .tiptap-horizontal-ruler { position:relative;height:22px;transform-origin:top left; }
+        .tiptap-ui .tiptap-ruler-scale, .tiptap-ui .tiptap-ruler-margins, .tiptap-ui .tiptap-ruler-indents, .tiptap-ui .tiptap-ruler-tabs { position:absolute;inset:0; }
+        .tiptap-ui .tiptap-ruler-num, .tiptap-ui .tiptap-ruler-tick, .tiptap-ui .tiptap-ruler-indent { position:absolute; }
+        .tiptap-ui .tiptap-ruler-indent { pointer-events:auto;touch-action:none; }
+        .tiptap-ui .tiptap-ruler-tab { position:absolute;width:10px;height:9px;pointer-events:auto; }
+        .tiptap-ui .tiptap-tab-run { display:inline-block;min-width:1px; }
+        .tiptap-ui .tiptap-ruler-margin { position:absolute;z-index:4;pointer-events:auto;touch-action:none; }
+        .tiptap-ui .tiptap-horizontal-ruler .tiptap-ruler-margin { width:4px;height:22px;transform:translateX(-50%); }
+        .tiptap-ui .tiptap-vertical-ruler .tiptap-ruler-margin { width:22px;height:4px;transform:translateY(-50%); }
       </style>
       <div class="tiptap-ui">
         <section class="document-viewport" id="viewport">
@@ -43,6 +56,7 @@ void main() {
         TableRowExtension(),
         TableCellExtension(),
         TableHeaderExtension(),
+        TabRenderingExtension(),
         PaginationExtension(
           options: PaginationOptions(
             pageWidth: 520,
@@ -86,6 +100,7 @@ void main() {
           'right': '0px',
           'top': '8px',
           'width': '130px',
+          'zIndex': '251659264',
         },
         'content': [
           {
@@ -120,45 +135,145 @@ void main() {
         ],
       },
     }, [
+      editor.state.schema.node('paragraph', {
+        'tabStops': [
+          {'position': '160px', 'type': 'left', 'leader': 'none'},
+        ],
+      }, [
+        editor.state.schema.text('Corpo\tValor do documento.'),
+      ]),
       editor.state.schema.node('paragraph', null, [
-        editor.state.schema.text('Corpo do documento.'),
+        editor.state.schema.text('Tab padrão\tsem parada explícita.'),
       ]),
     ]);
     editor.setDocument(doc);
     await Future<void>.delayed(const Duration(milliseconds: 180));
 
     final root = editor.view!.dom;
-    final ruler = web.document.querySelector('[data-tiptap-vertical-ruler]');
+    final ruler = web.document.querySelector('[data-tiptap-vertical-ruler]')
+        as web.HTMLElement;
+    final horizontal = web.document
+        .querySelector('[data-tiptap-horizontal-ruler]') as web.HTMLElement;
     final viewport = web.document.getElementById('viewport')!;
-    expect(ruler, isNotNull);
-    expect(ruler!.parentElement, same(viewport));
+    final pageScale =
+        web.document.querySelector('.page-scale') as web.HTMLElement;
+    final verticalTrack = ruler.parentElement as web.HTMLElement;
+    expect(verticalTrack.parentElement, same(viewport.parentElement));
+    expect(horizontal.parentElement, same(viewport.parentElement));
     expect(
       web.window.getComputedStyle(ruler).getPropertyValue('float'),
       isNot('left'),
       reason: 'a régua não pode participar dos floats usados pela paginação',
     );
-    expect(ruler.getBoundingClientRect().height, 0);
-    final pageRect = root.getBoundingClientRect();
-    final rulerRect = ruler.getBoundingClientRect();
-    final rulerGap = pageRect.left - rulerRect.right;
+    expect(ruler.getBoundingClientRect().height, closeTo(500, 1));
+    expect(ruler.querySelectorAll('.tiptap-ruler-num').length, greaterThan(0));
     expect(
-      rulerGap,
-      inInclusiveRange(4, 9),
-      reason: 'a régua fica encostada à borda esquerda da folha',
+      horizontal.querySelectorAll('.tiptap-ruler-indent').length,
+      4,
+      reason: 'a régua horizontal mostra os quatro marcadores de recuo',
     );
-    final pageScale =
-        web.document.querySelector('.page-scale') as web.HTMLElement;
+    final renderedTab =
+        root.querySelector('.tiptap-tab-run') as web.HTMLElement;
+    expect(renderedTab.getBoundingClientRect().width, greaterThan(20));
+    expect(root.querySelectorAll('.tiptap-tab-run').length, 2);
+    expect(
+      (root.querySelectorAll('.tiptap-tab-run').item(1) as web.HTMLElement)
+          .getBoundingClientRect()
+          .width,
+      greaterThan(1),
+      reason: 'tabs sem w:tabs usam a parada padrão de 1,25 cm',
+    );
+    final pageRect = root.getBoundingClientRect();
+    final viewportRect = viewport.getBoundingClientRect();
+    final rulerRect = ruler.getBoundingClientRect();
+    expect(
+      rulerRect.left,
+      closeTo(viewportRect.left, 1),
+      reason: 'a régua fica na borda esquerda da área de trabalho',
+    );
+    expect(
+      rulerRect.top,
+      closeTo(pageRect.top, 1),
+      reason: 'a escala vertical começa no topo da página ativa',
+    );
     pageScale.style.setProperty('zoom', '.75');
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    final zoomedGap =
-        root.getBoundingClientRect().left - ruler.getBoundingClientRect().right;
     expect(
-      zoomedGap,
-      inInclusiveRange(4, 9),
-      reason: 'a régua acompanha a folha após mudar o zoom',
+      ruler.getBoundingClientRect().height,
+      closeTo(375, 1),
+      reason: 'a régua acompanha a escala de 75% da folha',
     );
     pageScale.style.removeProperty('zoom');
     await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    editor.setEditable(false);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(ruler.style.display, 'none');
+    expect(horizontal.style.display, 'none');
+    editor.setEditable(true);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(ruler.style.display, isEmpty);
+    expect(horizontal.style.display, isEmpty);
+
+    final selectBody = editor.state.tr;
+    selectBody.setSelection(TextSelection.create(selectBody.doc, 1));
+    editor.view!.dispatch(selectBody);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(horizontal.querySelectorAll('.tiptap-ruler-tab').length, 1);
+
+    _dragTab(horizontal, 220);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    var paragraphAttrs = editor.state.doc.firstChild!.attrs;
+    final movedTabs = paragraphAttrs['tabStops'] as List;
+    expect(movedTabs.single['position'], isNot('160px'));
+    final tabMarker = horizontal.querySelector('.tiptap-ruler-tab')!;
+    _doubleClick(tabMarker);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    paragraphAttrs = editor.state.doc.firstChild!.attrs;
+    expect((paragraphAttrs['tabStops'] as List).single['leader'], 'dot');
+    _addTab(horizontal, 300);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    paragraphAttrs = editor.state.doc.firstChild!.attrs;
+    expect((paragraphAttrs['tabStops'] as List).length, 2);
+
+    _dragIndent(horizontal, 'left', 80);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    paragraphAttrs = editor.state.doc.firstChild!.attrs;
+    expect(paragraphAttrs['marginLeft'], '40.00px');
+    expect(paragraphAttrs['textIndent'], '0.00px');
+
+    _dragIndent(horizontal, 'first', 100);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    paragraphAttrs = editor.state.doc.firstChild!.attrs;
+    expect(paragraphAttrs['marginLeft'], '40.00px');
+    expect(paragraphAttrs['textIndent'], '20.00px');
+
+    _dragIndent(horizontal, 'hanging', 90);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    paragraphAttrs = editor.state.doc.firstChild!.attrs;
+    expect(paragraphAttrs['marginLeft'], '50.00px');
+    expect(paragraphAttrs['textIndent'], '10.00px');
+
+    _dragIndent(horizontal, 'right', 450);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    paragraphAttrs = editor.state.doc.firstChild!.attrs;
+    expect(paragraphAttrs['marginRight'], '30.00px');
+
+    _dragMargin(horizontal, 'left', 60, vertical: false);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(editor.state.doc.attrs['pageMarginLeft'], '60.00px');
+
+    _dragMargin(horizontal, 'right', 440, vertical: false);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(editor.state.doc.attrs['pageMarginRight'], '80.00px');
+
+    _dragMargin(ruler, 'top', 70, vertical: true);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(editor.state.doc.attrs['pageMarginTop'], '70.00px');
+
+    _dragMargin(ruler, 'bottom', 410, vertical: true);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(editor.state.doc.attrs['pageMarginBottom'], '90.00px');
 
     var header = root.querySelector(
       '.tiptap-page-header[data-page-number="1"]',
@@ -203,6 +318,13 @@ void main() {
     );
     expect(header.querySelectorAll('.tiptap-object-handle').length, 8);
     expect(header.querySelector('.tiptap-page-object-toolbar'), isNotNull);
+    final overlay = header.querySelector('.tiptap-page-editor-overlay')!;
+    expect(
+      int.parse(web.window.getComputedStyle(overlay).zIndex),
+      greaterThan(int.parse(web.window.getComputedStyle(textBox).zIndex)),
+      reason:
+          'a toolbar contextual precisa ficar acima do z-index importado da caixa',
+    );
     expect(
       header
           .querySelector('[data-page-object-action="left"]')
@@ -410,5 +532,146 @@ void _click(web.Element target) {
   target.dispatchEvent(web.MouseEvent(
     'click',
     web.MouseEventInit(bubbles: true, cancelable: true),
+  ));
+}
+
+void _dragIndent(web.HTMLElement horizontalTrack, String kind, double x) {
+  final ruler = horizontalTrack.querySelector('.tiptap-horizontal-ruler')!;
+  final marker = horizontalTrack.querySelector(
+    '[data-ruler-indent="$kind"]',
+  )!;
+  final rulerRect = ruler.getBoundingClientRect();
+  final markerRect = marker.getBoundingClientRect();
+  marker.dispatchEvent(web.PointerEvent(
+    'pointerdown',
+    web.PointerEventInit(
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: (markerRect.left + markerRect.width / 2).round(),
+      clientY: (markerRect.top + markerRect.height / 2).round(),
+    ),
+  ));
+  web.window.dispatchEvent(web.PointerEvent(
+    'pointermove',
+    web.PointerEventInit(
+      bubbles: true,
+      cancelable: true,
+      buttons: 1,
+      clientX: (rulerRect.left + x).round(),
+      clientY: (rulerRect.top + rulerRect.height / 2).round(),
+    ),
+  ));
+  web.window.dispatchEvent(web.PointerEvent(
+    'pointerup',
+    web.PointerEventInit(
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: (rulerRect.left + x).round(),
+      clientY: (rulerRect.top + rulerRect.height / 2).round(),
+    ),
+  ));
+}
+
+void _dragTab(web.HTMLElement horizontalTrack, double x) {
+  final ruler = horizontalTrack.querySelector('.tiptap-horizontal-ruler')!;
+  final marker = horizontalTrack.querySelector('.tiptap-ruler-tab')!;
+  final rulerRect = ruler.getBoundingClientRect();
+  final markerRect = marker.getBoundingClientRect();
+  marker.dispatchEvent(web.PointerEvent(
+    'pointerdown',
+    web.PointerEventInit(
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: (markerRect.left + markerRect.width / 2).round(),
+      clientY: (markerRect.top + markerRect.height / 2).round(),
+    ),
+  ));
+  web.window.dispatchEvent(web.PointerEvent(
+    'pointermove',
+    web.PointerEventInit(
+      bubbles: true,
+      cancelable: true,
+      buttons: 1,
+      clientX: (rulerRect.left + x).round(),
+      clientY: (rulerRect.top + rulerRect.height / 2).round(),
+    ),
+  ));
+  web.window.dispatchEvent(web.PointerEvent(
+    'pointerup',
+    web.PointerEventInit(
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: (rulerRect.left + x).round(),
+      clientY: (rulerRect.top + rulerRect.height / 2).round(),
+    ),
+  ));
+}
+
+void _addTab(web.HTMLElement horizontalTrack, double x) {
+  final ruler = horizontalTrack.querySelector('.tiptap-horizontal-ruler')!;
+  final rect = ruler.getBoundingClientRect();
+  ruler.dispatchEvent(web.PointerEvent(
+    'pointerdown',
+    web.PointerEventInit(
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: (rect.left + x).round(),
+      clientY: (rect.top + rect.height / 2).round(),
+    ),
+  ));
+}
+
+void _dragMargin(
+  web.HTMLElement container,
+  String side,
+  double position, {
+  required bool vertical,
+}) {
+  final ruler = vertical
+      ? container
+      : container.querySelector('.tiptap-horizontal-ruler')!;
+  final marker = container.querySelector('[data-ruler-margin="$side"]')!;
+  final rulerRect = ruler.getBoundingClientRect();
+  final markerRect = marker.getBoundingClientRect();
+  final targetX = vertical
+      ? rulerRect.left + rulerRect.width / 2
+      : rulerRect.left + position;
+  final targetY = vertical
+      ? rulerRect.top + position
+      : rulerRect.top + rulerRect.height / 2;
+  marker.dispatchEvent(web.PointerEvent(
+    'pointerdown',
+    web.PointerEventInit(
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: (markerRect.left + markerRect.width / 2).round(),
+      clientY: (markerRect.top + markerRect.height / 2).round(),
+    ),
+  ));
+  web.window.dispatchEvent(web.PointerEvent(
+    'pointermove',
+    web.PointerEventInit(
+      bubbles: true,
+      cancelable: true,
+      buttons: 1,
+      clientX: targetX.round(),
+      clientY: targetY.round(),
+    ),
+  ));
+  web.window.dispatchEvent(web.PointerEvent(
+    'pointerup',
+    web.PointerEventInit(
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: targetX.round(),
+      clientY: targetY.round(),
+    ),
   ));
 }

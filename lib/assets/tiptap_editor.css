@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'FluentSystemIcons';
+  src: url('fonts/FluentSystemIcons-Regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: normal;
+  font-display: block;
+}
+
 /*
  * Portable editor chrome for package:docx_rendering.
  *
@@ -9,6 +17,20 @@
  * editable descendants at runtime. Every rule is scoped by `.tiptap-ui`, so
  * multiple instances can coexist without styling the rest of the application.
  */
+.tiptap-fluent-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  font-family: 'FluentSystemIcons' !important;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  line-height: 1;
+  text-transform: none;
+  speak: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 .tiptap-ui {
   --tiptap-ink: #17171b;
   --tiptap-muted: #707078;
@@ -141,6 +163,15 @@
 .tiptap-ui .ProseMirror td { min-width: 70px; padding: 7px 9px; border: 1px solid #cfcfd4; }
 .tiptap-ui .ProseMirror th > p,
 .tiptap-ui .ProseMirror td > p { margin-bottom: 0; }
+
+/* Interactive table resizing: the plugin toggles these classes while the
+   pointer hovers a cell boundary. */
+.tiptap-ui .ProseMirror.tiptap-resize-col,
+.tiptap-ui .ProseMirror.tiptap-resize-col td,
+.tiptap-ui .ProseMirror.tiptap-resize-col th { cursor: col-resize; }
+.tiptap-ui .ProseMirror.tiptap-resize-row,
+.tiptap-ui .ProseMirror.tiptap-resize-row td,
+.tiptap-ui .ProseMirror.tiptap-resize-row th { cursor: row-resize; }
 .tiptap-ui .ProseMirror th { background: #f4f4f5; }
 .tiptap-ui .ProseMirror table[data-docx-textbox] {
   margin: 0;
@@ -164,6 +195,7 @@
   padding: 0;
   pointer-events: none;
   user-select: none;
+  transform-origin: top left;
 }
 .tiptap-ui .tiptap-page-spacer,
 .tiptap-ui .breaker {
@@ -181,12 +213,14 @@
 }
 .tiptap-ui .tiptap-page-region-active {
   z-index: 12;
+  isolation: isolate;
   cursor: text;
   outline: none;
 }
 .tiptap-ui .tiptap-page-editor-overlay {
   position: absolute;
-  z-index: 40;
+  /* Imported floating DOCX objects can carry very large inline z-indexes. */
+  z-index: 2147483646;
   left: 0;
   right: 0;
   height: 0;
@@ -256,7 +290,7 @@
 .tiptap-ui .tiptap-page-object-selected { outline: none; }
 .tiptap-ui .tiptap-page-object-selection {
   position: absolute;
-  z-index: 50;
+  z-index: 2147483645;
   border: 1.5px solid var(--tiptap-accent);
   pointer-events: none;
 }
@@ -300,38 +334,191 @@
 }
 .tiptap-ui .tiptap-vertical-ruler {
   position: absolute;
-  z-index: 8;
-  top: 8px;
-  left: 8px;
-  width: 22px;
-  height: 0;
-  min-height: 0;
-  overflow: visible;
+  z-index: 18;
+  box-sizing: border-box;
+  overflow: hidden;
   margin: 0;
+  border: 0;
+  color: #555555;
   pointer-events: none;
   user-select: none;
 }
-.tiptap-ui .tiptap-vertical-ruler::before {
+.tiptap-ui .tiptap-horizontal-ruler-track {
+  position: relative;
+  z-index: 24;
+  height: 22px;
+  flex: 0 0 22px;
+  overflow: hidden;
+  background: var(--tiptap-canvas);
+  pointer-events: none;
+  user-select: none;
+}
+.tiptap-ui .tiptap-horizontal-ruler-center {
+  position: absolute;
+  top: 0;
+  width: fit-content;
+  height: 22px;
+  margin: 0;
+}
+.tiptap-ui .tiptap-horizontal-ruler {
+  position: relative;
+  box-sizing: border-box;
+  height: 22px;
+  overflow: visible;
+  border: 0;
+  color: #555555;
+  transform-origin: top left;
+}
+.tiptap-ui .tiptap-vertical-ruler-track {
+  position: absolute;
+  z-index: 18;
+  width: 22px;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.tiptap-ui .tiptap-ruler-scale,
+.tiptap-ui .tiptap-ruler-margins,
+.tiptap-ui .tiptap-ruler-indents {
+  position: absolute;
+  inset: 0;
+}
+/* Word does not draw a permanent bar at the margin boundary — only the
+   gray/white transition. The handle stays invisible and merely changes the
+   cursor; hovering/dragging paints it for feedback. */
+.tiptap-ui .tiptap-ruler-margin {
+  position: absolute;
+  z-index: 4;
+  box-sizing: border-box;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+}
+.tiptap-ui .tiptap-horizontal-ruler .tiptap-ruler-margin {
+  top: 0;
+  width: 4px;
+  height: 100%;
+  transform: translateX(-50%);
+  cursor: ew-resize;
+}
+.tiptap-ui .tiptap-vertical-ruler .tiptap-ruler-margin {
+  left: 0;
+  width: 100%;
+  height: 4px;
+  transform: translateY(-50%);
+  cursor: ns-resize;
+}
+.tiptap-ui .tiptap-ruler-margin::after {
   content: '';
   position: absolute;
-  z-index: -1;
-  top: 0;
-  left: 0;
-  width: 22px;
-  height: min(760px, calc(100vh - 220px));
-  min-height: 520px;
-  border: 1px solid color-mix(in srgb, var(--tiptap-line) 84%, #888);
-  border-radius: 4px;
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 8px, #a6a6ac 8px 9px, transparent 9px 19px),
-    color-mix(in srgb, var(--tiptap-surface) 93%, transparent);
-  box-shadow: 0 2px 9px rgba(0, 0, 0, .08);
+  inset: -6px;
 }
-.tiptap-ui .tiptap-ruler-number {
+.tiptap-ui .tiptap-ruler-margin:hover,
+.tiptap-ui .tiptap-ruler-margin.is-dragging {
+  background: var(--tiptap-accent);
+}
+/* OnlyOffice scale (Rulers.js drawLayoutMM): the band spans 4..17px of the
+   strip, quarters are 3px ticks and halves 5px ticks centred at 10.5px, and
+   whole centimetres draw a 7pt Arial number with its baseline 3px above the
+   band bottom — in the margins too. */
+.tiptap-ui .tiptap-ruler-num,
+.tiptap-ui .tiptap-ruler-tick {
   position: absolute;
-  left: 2px;
-  color: var(--tiptap-muted);
-  font: 8px/1 Arial, sans-serif;
+  color: #555555;
+  font: 9px/1 Arial, sans-serif;
+}
+.tiptap-ui .tiptap-horizontal-ruler .tiptap-ruler-num {
+  bottom: 6px;
+  transform: translateX(-50%);
+}
+.tiptap-ui .tiptap-horizontal-ruler .tiptap-ruler-tick {
+  top: 10.5px;
+  width: 1px;
+  height: 5px;
+  transform: translate(-50%, -50%);
+  background: #555555;
+}
+.tiptap-ui .tiptap-horizontal-ruler .tiptap-ruler-tick.is-quarter {
+  height: 3px;
+}
+.tiptap-ui .tiptap-vertical-ruler .tiptap-ruler-num {
+  right: 6px;
+  transform: translateY(-50%);
+}
+.tiptap-ui .tiptap-vertical-ruler .tiptap-ruler-tick {
+  left: 10.5px;
+  width: 5px;
+  height: 1px;
+  transform: translate(-50%, -50%);
+  background: #555555;
+}
+.tiptap-ui .tiptap-vertical-ruler .tiptap-ruler-tick.is-quarter {
+  width: 3px;
+}
+.tiptap-ui .tiptap-ruler-indent {
+  position: absolute;
+  z-index: 2;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .7));
+  pointer-events: auto;
+  touch-action: none;
+  cursor: ew-resize;
+}
+.tiptap-ui .tiptap-ruler-indent::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.tiptap-ui .tiptap-ruler-indent:hover,
+.tiptap-ui .tiptap-ruler-indent.is-dragging {
+  filter: drop-shadow(0 0 2px var(--tiptap-accent));
+}
+.tiptap-ui .tiptap-ruler-dragging { cursor: ew-resize; }
+/* OnlyOffice markers (blitFirstInd/blitLeftInd/blitRightInd,
+   Rulers.js:2420-2494): white fill with a #555 outline, ~9px wide. The
+   outline is the element background; the fill is a ::before clipped by the
+   same polygon, inset by 1px. */
+.tiptap-ui .tiptap-ruler-indent-first,
+.tiptap-ui .tiptap-ruler-indent-hanging,
+.tiptap-ui .tiptap-ruler-indent-right {
+  width: 9px;
+  background: #555555;
+}
+.tiptap-ui .tiptap-ruler-indent-first::before,
+.tiptap-ui .tiptap-ruler-indent-hanging::before,
+.tiptap-ui .tiptap-ruler-indent-right::before,
+.tiptap-ui .tiptap-ruler-indent-left::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  background: #ffffff;
+  clip-path: inherit;
+}
+/* Flat cap 3px above the band top (y 1..4), tip reaching y 10. */
+.tiptap-ui .tiptap-ruler-indent-first {
+  top: 1px;
+  height: 9px;
+  clip-path: polygon(0 0, 100% 0, 100% 33%, 50% 100%, 0 33%);
+}
+/* Pentagon pointing up: tip at y 11, flat bottom on the band bottom (17). */
+.tiptap-ui .tiptap-ruler-indent-hanging {
+  top: 11px;
+  height: 6px;
+  clip-path: polygon(50% 0, 100% 50%, 100% 100%, 0 100%, 0 50%);
+}
+/* Box hanging below the band (y 17..22), forming Word's combined glyph. */
+.tiptap-ui .tiptap-ruler-indent-left {
+  top: 17px;
+  width: 9px;
+  height: 5px;
+  background: #555555;
+}
+.tiptap-ui .tiptap-ruler-indent-right {
+  top: 11px;
+  height: 6px;
+  clip-path: polygon(50% 0, 100% 50%, 100% 100%, 0 100%, 0 50%);
 }
 .tiptap-ui .tiptap-pagination-gap {
   border-top: 1px solid var(--tiptap-line);
@@ -388,5 +575,14 @@
 
 @media (max-width: 720px) {
   .tiptap-ui .document-viewport { padding-inline: 18px; }
-  .tiptap-ui .tiptap-vertical-ruler { display: none; }
+  .tiptap-ui .tiptap-vertical-ruler,
+  .tiptap-ui .tiptap-horizontal-ruler-track { display: none !important; }
+}
+
+/* Sumário gerado (Inserir → Sumário). */
+.tiptap-ui .ProseMirror div[data-docx-toc] { margin: 1em 0; }
+.tiptap-ui .ProseMirror div[data-docx-toc] > p { margin: 0 0 .4em; }
+.tiptap-ui .ProseMirror div[data-docx-toc] > p:first-child {
+  font-size: 1.12em;
+  margin-bottom: .7em;
 }

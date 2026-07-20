@@ -1,40 +1,28 @@
-import 'dart:js_interop';
-
+import 'package:docx_rendering/tiptap.dart';
 import 'package:web/web.dart' as web;
-import 'package:docx_rendering/docx_rendering.dart';
 
 void main() {
-  final fileInput = web.document.getElementById('fileInput') as web.HTMLInputElement;
-  final container = web.document.getElementById('container') as web.HTMLElement;
-
-  fileInput.addEventListener('change', (web.Event e) {
-    final files = fileInput.files;
-    if (files != null && files.length > 0) {
-      final file = files.item(0)!;
-      final reader = web.FileReader();
-      
-      reader.onload = (web.Event _) {
-        final buffer = reader.result as JSArrayBuffer;
-        final bytes = buffer.toDart.asUint8List();
-        
-        container.innerHTML = ''.toJS; // clear
-        
-        // Use docx_rendering to render
-        renderAsync(bytes, container, null, null).then((_) {
-          // Approximate dynamic pagination: split the tall page into A4 pages,
-          // repeating header/footer (see src/renderer/pagination.dart).
-          try {
-            paginate(container);
-          } catch (e) {
-            print('Pagination error: $e');
-          }
-          print('Render complete!');
-        }).catchError((e) {
-          print('Render error: $e');
-        });
-      }.toJS;
-      
-      reader.readAsArrayBuffer(file);
-    }
-  }.toJS);
+  TiptapDocxEditorComponent.mount(
+    web.document.getElementById('app') as web.HTMLElement,
+    options: const TiptapDocxEditorOptions(
+      shell: TiptapEditorShellOptions(
+        initialMode: TiptapEditorMode.word,
+        locale: 'Português (Brasil)',
+        width: '100%',
+        height: 'min(840px, calc(100vh - 40px))',
+        maxWidth: '1200px',
+        margin: '0 auto',
+        showTitleBar: true,
+        showStatusBar: true,
+        enableDocumentStatistics: false,
+        hostStyles: {
+          'min-height': '100vh',
+          'padding': '20px',
+          'box-sizing': 'border-box',
+          'background': '#e9eef2',
+        },
+      ),
+      exposeDebugApi: true,
+    ),
+  );
 }

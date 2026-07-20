@@ -7,11 +7,29 @@ import 'package:docx_rendering/src/prosemirror/model/index.dart';
 import 'package:docx_rendering/src/tiptap/converters/docx_export.dart';
 
 Schema buildSchema() {
-  AttributeSpec nullable() => AttributeSpec(defaultValue: null, hasDefault: true);
+  AttributeSpec nullable() =>
+      AttributeSpec(defaultValue: null, hasDefault: true);
   return Schema(SchemaSpec(nodes: {
-    'doc': NodeSpec(content: 'block+'),
-    'paragraph': NodeSpec(
-        content: 'inline*', group: 'block', attrs: {'textAlign': nullable()}),
+    'doc': NodeSpec(content: 'block+', attrs: {
+      'pageWidth': nullable(),
+      'pageHeight': nullable(),
+      'pageOrientation': nullable(),
+      'pageMarginTop': nullable(),
+      'pageMarginRight': nullable(),
+      'pageMarginBottom': nullable(),
+      'pageMarginLeft': nullable(),
+      'pageMarginHeader': nullable(),
+      'pageMarginFooter': nullable(),
+      'pageMarginGutter': nullable(),
+      'defaultTabStop': nullable(),
+    }),
+    'paragraph': NodeSpec(content: 'inline*', group: 'block', attrs: {
+      'textAlign': nullable(),
+      'marginLeft': nullable(),
+      'marginRight': nullable(),
+      'textIndent': nullable(),
+      'tabStops': nullable(),
+    }),
     'heading': NodeSpec(content: 'inline*', group: 'block', attrs: {
       'level': AttributeSpec(defaultValue: 1, hasDefault: true),
       'textAlign': nullable(),
@@ -72,10 +90,19 @@ void main() {
     final bytes = await DocxExporter().export(pmDoc);
     final archive = ZipArchive.decodeBytes(bytes);
 
-    expect(archive.entryNames,
-        containsAll(['[Content_Types].xml', '_rels/.rels', 'word/document.xml', 'word/styles.xml', 'word/_rels/document.xml.rels']));
+    expect(
+        archive.entryNames,
+        containsAll([
+          '[Content_Types].xml',
+          '_rels/.rels',
+          'word/document.xml',
+          'word/styles.xml',
+          'word/settings.xml',
+          'word/_rels/document.xml.rels'
+        ]));
     expect(archive.readString('_rels/.rels'), contains('word/document.xml'));
-    expect(documentXmlOf(bytes), contains('<w:t xml:space="preserve">hello</w:t>'));
+    expect(documentXmlOf(bytes),
+        contains('<w:t xml:space="preserve">hello</w:t>'));
   });
 
   test('exporta heading, alinhamento e marcas', () async {
@@ -88,11 +115,13 @@ void main() {
       schema.node('paragraph', null, [
         schema.text('Olá '),
         schema.text('negrito', [bold.create()]),
-        schema.text('itálico vermelho',
-            [italic.create(), textStyle.create({'color': '#ff0000'})]),
+        schema.text('itálico vermelho', [
+          italic.create(),
+          textStyle.create({'color': '#ff0000'})
+        ]),
       ]),
-      schema.node('paragraph', {'textAlign': 'center'},
-          [schema.text('centralizado')]),
+      schema.node(
+          'paragraph', {'textAlign': 'center'}, [schema.text('centralizado')]),
     ]);
 
     final xml = documentXmlOf(await DocxExporter().export(pmDoc));
@@ -110,6 +139,96 @@ void main() {
     ]);
     final xml = documentXmlOf(await DocxExporter().export(pmDoc));
     expect(xml, contains('a &lt; b &amp; &quot;c&quot; &gt; d'));
+  });
+
+  test('exporta recuos da régua como w:ind em twips', () async {
+    final pmDoc = schema.node('doc', null, [
+      schema.node(
+        'paragraph',
+        {
+          'marginLeft': '40px',
+          'marginRight': '18pt',
+          'textIndent': '20px',
+        },
+        [schema.text('primeira linha')],
+      ),
+      schema.node(
+        'paragraph',
+        {'marginLeft': '2cm', 'textIndent': '-12px'},
+        [schema.text('recuo francês')],
+      ),
+    ]);
+
+    final xml = documentXmlOf(await DocxExporter().export(pmDoc));
+    expect(
+      xml,
+      contains('<w:ind w:left="600" w:right="360" w:firstLine="300"/>'),
+    );
+    expect(xml, contains('w:left="1134" w:hanging="180"'));
+  });
+
+  test('exporta paradas e caracteres de tabulação como WordprocessingML',
+      () async {
+    final pmDoc = schema.node('doc', {
+      'defaultTabStop': '1cm'
+    }, [
+      schema.node(
+        'paragraph',
+        {
+          'tabStops': [
+            {'position': '3cm', 'type': 'left', 'leader': 'dot'},
+            {'position': '6cm', 'type': 'decimal', 'leader': 'none'},
+          ],
+        },
+        [schema.text('Rótulo\t123,45')],
+      ),
+    ]);
+
+    final bytes = await DocxExporter().export(pmDoc);
+    final xml = documentXmlOf(bytes);
+    expect(xml, contains('<w:tabs>'));
+    expect(xml, contains('w:val="left" w:leader="dot" w:pos="1701"'));
+    expect(xml, contains('w:val="decimal" w:leader="none" w:pos="3402"'));
+    expect(xml, contains('<w:tab/>'));
+    expect(xml, isNot(contains('<w:t xml:space="preserve">Rótulo\t123,45')));
+    final archive = ZipArchive.decodeBytes(bytes);
+    expect(
+      archive.readString('word/settings.xml'),
+      contains('<w:defaultTabStop w:val="567"/>'),
+    );
+    expect(
+      archive.readString('word/_rels/document.xml.rels'),
+      contains('Target="settings.xml"'),
+    );
+  });
+
+  test('exporta tamanho, orientação e margens da página', () async {
+    final pmDoc = schema.node('doc', {
+      'pageWidth': '11in',
+      'pageHeight': '8.5in',
+      'pageOrientation': 'landscape',
+      'pageMarginTop': '48px',
+      'pageMarginRight': '54pt',
+      'pageMarginBottom': '2cm',
+      'pageMarginLeft': '15mm',
+      'pageMarginHeader': '24px',
+      'pageMarginFooter': '0.5in',
+      'pageMarginGutter': '0px',
+    }, [
+      schema.node('paragraph', null, [schema.text('paisagem')]),
+    ]);
+
+    final xml = documentXmlOf(await DocxExporter().export(pmDoc));
+    expect(
+      xml,
+      contains('<w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/>'),
+    );
+    expect(xml, contains('w:top="720"'));
+    expect(xml, contains('w:right="1080"'));
+    expect(xml, contains('w:bottom="1134"'));
+    expect(xml, contains('w:left="850"'));
+    expect(xml, contains('w:header="360"'));
+    expect(xml, contains('w:footer="720"'));
   });
 
   test('exporta listas com numbering.xml', () async {
@@ -136,7 +255,9 @@ void main() {
 
   test('exporta tabela com gridSpan', () async {
     PMNode cell(String type, String text, [int colspan = 1]) =>
-        schema.node(type, {'colspan': colspan}, [
+        schema.node(type, {
+          'colspan': colspan
+        }, [
           schema.node('paragraph', null, [schema.text(text)])
         ]);
     final pmDoc = schema.node('doc', null, [
@@ -156,8 +277,8 @@ void main() {
 
   test('exporta imagem de data URI com parte de mídia e rel', () async {
     final pmDoc = schema.node('doc', null, [
-      schema.node('image',
-          {'src': _pngDataUri, 'width': '100', 'height': '50'}),
+      schema
+          .node('image', {'src': _pngDataUri, 'width': '100', 'height': '50'}),
     ]);
 
     final bytes = await DocxExporter().export(pmDoc);

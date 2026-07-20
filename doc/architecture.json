@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "docx_rendering Architecture",
+    "subtitle": "Tiptap, ProseMirror, and DOCX Engine in Pure Dart",
+    "output": "examples/docx_rendering.html"
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [40, 100],
+    "cols": 6,
+    "gapX": 90,
+    "gapY": 80,
+    "cellW": 140,
+    "cellH": 70
+  },
+  "components": [
+    { "id": "assets", "type": "cloud", "label": "Office/Fabric CDN", "sublabel": "Fluent Icons & CSS", "row": 0, "col": 2 },
+    { "id": "browser", "type": "external", "label": "Web Browser", "sublabel": "JS/DOM Sandbox", "row": 1, "col": 0 },
+    { "id": "app_main", "type": "frontend", "label": "main.dart", "sublabel": "Web App Entrypoint", "row": 1, "col": 1 },
+    { "id": "ui_shell", "type": "frontend", "label": "TiptapDocxEditor", "sublabel": "UI Toolbar & Shell", "row": 1, "col": 2 },
+    { "id": "editor_kernel", "type": "backend", "label": "Editor Kernel", "sublabel": "Tiptap/ProseMirror JS wrapper", "row": 1, "col": 3 },
+    { "id": "docx_preview", "type": "frontend", "label": "DocxPreview", "sublabel": "Preview Pane & Component", "row": 1, "col": 4 },
+    { "id": "zip_archive", "type": "database", "label": "Zip Archive", "sublabel": "Reads/Writes package byte container", "row": 2, "col": 3 },
+    { "id": "docx_parser", "type": "backend", "label": "DocumentParser", "sublabel": "Extracts XML parts & layout model", "row": 2, "col": 4 },
+    { "id": "docx_doc", "type": "database", "label": "WordDocument", "sublabel": "In-memory OpenXML document model", "row": 2, "col": 5 },
+    { "id": "html_renderer", "type": "backend", "label": "HtmlRenderer", "sublabel": "Translates document model to HTML", "row": 3, "col": 5 }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Web UI Layer",
+      "wraps": ["app_main", "ui_shell", "docx_preview"]
+    },
+    {
+      "kind": "region",
+      "label": "docx_rendering Core (Dart)",
+      "wraps": ["editor_kernel", "zip_archive", "docx_parser", "docx_doc", "html_renderer"]
+    }
+  ],
+  "connections": [
+    { "from": "browser", "to": "app_main", "label": "loads", "fromSide": "right", "toSide": "left" },
+    { "from": "app_main", "to": "ui_shell", "label": "mounts", "fromSide": "right", "toSide": "left" },
+    { "from": "ui_shell", "to": "assets", "label": "fetches styles", "variant": "dashed", "fromSide": "top", "toSide": "bottom" },
+    { "from": "ui_shell", "to": "editor_kernel", "label": "commands", "fromSide": "right", "toSide": "left" },
+    { "from": "editor_kernel", "to": "docx_preview", "label": "synchronizes", "fromSide": "right", "toSide": "left", "labelDy": -15 },
+    { "from": "docx_preview", "to": "zip_archive", "label": "opens .docx bytes", "fromSide": "bottom", "toSide": "top" },
+    { "from": "zip_archive", "to": "docx_parser", "label": "feeds XML nodes", "fromSide": "right", "toSide": "left", "labelDy": -15 },
+    { "from": "docx_parser", "to": "docx_doc", "label": "structures model", "fromSide": "right", "toSide": "left", "labelDy": -15 },
+    { "from": "docx_doc", "to": "html_renderer", "label": "supplies payload", "fromSide": "bottom", "toSide": "top", "labelAt": [1310, 474] },
+    { "from": "html_renderer", "to": "docx_preview", "label": "outputs HTML preview", "variant": "emphasis", "fromSide": "left", "toSide": "bottom", "labelDy": -39 }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Document Lifecycle Flow",
+      "items": [
+        "1. main.dart boots and mounts TiptapDocxEditor Component",
+        "2. UI Shell initializes Tiptap editor and Preview pane",
+        "3. Preview loads binary DOCX file via Zip Archive layer",
+        "4. DocumentParser processes OpenXML nodes into WordDocument objects",
+        "5. HtmlRenderer translates document structure to standard HTML/CSS"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Architecture Details",
+      "items": [
+        "Pure Dart DOCX Engine (Zero heavy third-party dependencies)",
+        "Tiptap & ProseMirror wrapper handles DOM editing",
+        "Office Online icons loaded dynamically from Fabric CDN"
+      ]
+    }
+  ]
+}

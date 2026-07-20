@@ -5,6 +5,7 @@ import 'package:web/web.dart' as web;
 
 import '../../prosemirror/model/from_dom.dart';
 import '../../prosemirror/view/index.dart';
+import '../ui/word_rulers.dart';
 
 /// Interactive editor for the materialized header/footer copies created by
 /// the pagination extension.
@@ -19,10 +20,7 @@ class PageRegionEditor {
   web.HTMLElement? _region;
   web.HTMLElement? _selectedObject;
   web.HTMLElement? _objectSelection;
-  web.HTMLElement? _verticalRuler;
-  web.HTMLElement? _rulerViewport;
-  web.Element? _rulerZoomAnchor;
-  web.MutationObserver? _rulerZoomObserver;
+  late final WordRulers _rulers;
   bool _dirty = false;
   bool _committing = false;
 
@@ -34,18 +32,15 @@ class PageRegionEditor {
   JSFunction? _pointerDownListener;
   JSFunction? _transformMoveListener;
   JSFunction? _transformEndListener;
-  JSFunction? _rulerScrollListener;
-  JSFunction? _windowResizeListener;
 
   PageRegionEditor(this.view) {
     _installListeners();
-    _installVerticalRuler();
+    _rulers = WordRulers(view);
   }
 
   void update(EditorView nextView) {
     view = nextView;
-    _installVerticalRuler();
-    _positionVerticalRuler();
+    _rulers.update(nextView);
   }
 
   void paginationRebuilt() {
@@ -56,8 +51,9 @@ class PageRegionEditor {
       _selectedObject = null;
       _objectSelection = null;
       view.dom.classList.remove('tiptap-page-region-editing');
+      _notifyContextChanged();
     }
-    _positionVerticalRuler();
+    _rulers.refresh();
   }
 
   void _installListeners() {
@@ -166,106 +162,6 @@ class PageRegionEditor {
       ..addEventListener('pointerdown', _pointerDownListener);
   }
 
-  void _installVerticalRuler() {
-    final viewport = view.dom.closest('.document-viewport');
-    if (viewport is! web.HTMLElement) return;
-    final existing = viewport.querySelector(
-      ':scope > [data-tiptap-vertical-ruler]',
-    );
-    if (existing is web.HTMLElement) {
-      _verticalRuler = existing;
-      _bindRulerViewport(viewport);
-      _positionVerticalRuler();
-      return;
-    }
-    final ruler = web.document.createElement('div') as web.HTMLElement;
-    ruler
-      ..className = 'tiptap-vertical-ruler'
-      ..setAttribute('data-tiptap-vertical-ruler', 'true')
-      ..setAttribute('aria-hidden', 'true')
-      ..setAttribute('contenteditable', 'false');
-    for (var centimetre = 0; centimetre <= 30; centimetre++) {
-      final label = web.document.createElement('span') as web.HTMLElement;
-      label
-        ..className = 'tiptap-ruler-number'
-        ..setAttribute('data-centimetre', '$centimetre')
-        ..textContent = '$centimetre';
-      label.style.top = '${centimetre * 37.795}px';
-      ruler.appendChild(label);
-    }
-    viewport.insertBefore(ruler, viewport.firstChild);
-    _verticalRuler = ruler;
-    _bindRulerViewport(viewport);
-    _positionVerticalRuler();
-  }
-
-  void _bindRulerViewport(web.HTMLElement viewport) {
-    if (identical(_rulerViewport, viewport)) return;
-    if (_rulerViewport != null && _rulerScrollListener != null) {
-      _rulerViewport!.removeEventListener('scroll', _rulerScrollListener);
-    }
-    if (_windowResizeListener != null) {
-      (web.window as web.EventTarget)
-          .removeEventListener('resize', _windowResizeListener);
-    }
-    _rulerViewport = viewport;
-    _rulerScrollListener = ((web.Event _) {
-      _positionVerticalRuler();
-    }).toJS;
-    _windowResizeListener = ((web.Event _) {
-      _positionVerticalRuler();
-    }).toJS;
-    viewport.addEventListener('scroll', _rulerScrollListener);
-    (web.window as web.EventTarget)
-        .addEventListener('resize', _windowResizeListener);
-    _bindRulerZoomAnchor();
-  }
-
-  void _bindRulerZoomAnchor() {
-    final anchor = view.dom.closest('.page-scale') ??
-        view.dom.closest('.page-sheet') ??
-        view.dom;
-    if (identical(_rulerZoomAnchor, anchor)) return;
-    _rulerZoomObserver?.disconnect();
-    _rulerZoomAnchor = anchor;
-    _rulerZoomObserver = web.MutationObserver(
-      ((JSArray<web.MutationRecord> records, web.MutationObserver observer) {
-        if (records.length > 0) _positionVerticalRuler();
-      }).toJS,
-    )..observe(
-        anchor,
-        web.MutationObserverInit(attributes: true),
-      );
-  }
-
-  /// Pins the ruler six pixels outside the rendered page edge.
-  ///
-  /// The page can be centered, horizontally scrolled, or transformed by the
-  /// host's zoom control. `getBoundingClientRect` observes all three, while
-  /// adding the viewport scroll offset converts the result back to the
-  /// viewport's absolute-positioning coordinate system.
-  void _positionVerticalRuler() {
-    final ruler = _verticalRuler;
-    final viewport = _rulerViewport;
-    if (ruler == null || viewport == null || !ruler.isConnected) return;
-    final page = view.dom.closest('.page-sheet') ?? view.dom;
-    final viewportRect = viewport.getBoundingClientRect();
-    final pageRect = page.getBoundingClientRect();
-    const rulerWidth = 22.0;
-    const gap = 6.0;
-    final left = math.max(
-      0.0,
-      pageRect.left -
-          viewportRect.left +
-          viewport.scrollLeft -
-          rulerWidth -
-          gap,
-    );
-    ruler.style
-      ..left = '${left.toStringAsFixed(2)}px'
-      ..top = '${(viewport.scrollTop + 8).toStringAsFixed(2)}px';
-  }
-
   void _activate(web.HTMLElement region) {
     if (identical(region, _region)) return;
     if (_region != null) _finishEditing(commit: true);
@@ -282,6 +178,7 @@ class PageRegionEditor {
       ..setAttribute('data-editing', 'true');
     region.appendChild(_buildRegionOverlay(region));
     _syncObjectToolbar();
+    _notifyContextChanged();
   }
 
   web.HTMLElement _buildRegionOverlay(web.HTMLElement region) {
@@ -583,6 +480,13 @@ class PageRegionEditor {
     pagination
       ?..removeAttribute('data-editing')
       ..setAttribute('aria-hidden', 'true');
+    _notifyContextChanged();
+  }
+
+  void _notifyContextChanged() {
+    view.dom.dispatchEvent(
+      web.Event('tiptap-context-change', web.EventInit(bubbles: true)),
+    );
   }
 
   void _clearObjectSelection() {
@@ -696,21 +600,7 @@ class PageRegionEditor {
   void destroy() {
     _removeTransformListeners();
     _finishEditing(commit: false);
-    _verticalRuler?.remove();
-    _verticalRuler = null;
-    if (_rulerViewport != null && _rulerScrollListener != null) {
-      _rulerViewport!.removeEventListener('scroll', _rulerScrollListener);
-    }
-    if (_windowResizeListener != null) {
-      (web.window as web.EventTarget)
-          .removeEventListener('resize', _windowResizeListener);
-    }
-    _rulerViewport = null;
-    _rulerZoomObserver?.disconnect();
-    _rulerZoomObserver = null;
-    _rulerZoomAnchor = null;
-    _rulerScrollListener = null;
-    _windowResizeListener = null;
+    _rulers.destroy();
     final dom = view.dom as web.EventTarget;
     dom
       ..removeEventListener('dblclick', _doubleClickListener)

@@ -1,0 +1,17 @@
+name: docx_rendering_angular_example
+description: Exemplo de integração do editor Tiptap/DOCX com AngularDart.
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  docx_rendering:
+    path: ..
+  web: ^1.1.1
+
+dev_dependencies:
+  build_runner: ^2.4.15
+  build_web_compilers: ^4.1.1
+  lints: ^5.0.0
+  webdev: ^3.7.1

@@ -27,6 +27,7 @@ class DocumentExtension extends NodeExtension {
               AttributeSpec(defaultValue: null, hasDefault: true),
           'pageMarginGutter':
               AttributeSpec(defaultValue: null, hasDefault: true),
+          'defaultTabStop': AttributeSpec(defaultValue: null, hasDefault: true),
           // Advisory page count cached by Word in docProps/app.xml. The
           // paginator uses it only to bootstrap documents whose oversized
           // table rows cannot participate in the float chain; it is released

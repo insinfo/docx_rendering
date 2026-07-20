@@ -21,3 +21,8 @@ export 'hard_break.dart';
 export 'horizontal_rule.dart';
 export 'history.dart';
 export 'pagination.dart';
+export 'tab_rendering.dart';
+export 'table_map.dart';
+export 'table_commands.dart';
+export 'table_resizing.dart';
+export 'table_of_contents.dart';

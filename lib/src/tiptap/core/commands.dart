@@ -1,5 +1,6 @@
 import '../../prosemirror/model/index.dart';
 import '../../prosemirror/state/index.dart';
+import '../../prosemirror/transform/index.dart' show insertPoint;
 
 /// Sets (or clears, when [alignment] is null) the `textAlign` attribute
 /// on every selected textblock whose type is one of [typeNames].
@@ -36,6 +37,30 @@ Command setTextAlignCommand(List<String> typeNames, String? alignment) {
 /// Inserts the given node at the selection, replacing it.
 Command insertNodeCommand(PMNode node) {
   return (state, [dispatch, view]) {
+    if (!node.isInline) {
+      final selection = state.selection;
+      final resolved = selection.fromRes;
+      var point = insertPoint(state.doc, selection.from, node.type);
+      // A cursor in the middle of a textblock is not itself a valid insertion
+      // point for a block. Walk outwards and place the block immediately after
+      // the nearest ancestor whose parent accepts it.
+      if (point == null) {
+        for (var depth = resolved.depth; depth > 0; depth--) {
+          final parent = resolved.node(depth - 1);
+          final index = resolved.indexAfter(depth - 1);
+          if (parent.canReplaceWith(index, index, node.type)) {
+            point = resolved.after(depth);
+            break;
+          }
+        }
+      }
+      if (point == null) return false;
+      if (dispatch != null) {
+        final tr = state.tr..insert(point, node);
+        dispatch(tr.scrollIntoView());
+      }
+      return true;
+    }
     if (dispatch != null) {
       final tr = state.tr;
       tr.replaceSelectionWith(node);

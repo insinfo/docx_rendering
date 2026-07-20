@@ -36,7 +36,7 @@ class DocxExporter {
 
   /// Exporta o documento ProseMirror para bytes de um arquivo .docx.
   Future<Uint8List> export(model.PMNode pmDoc) async {
-    final writer = _DocumentWriter();
+    final writer = _DocumentWriter(pmDoc.attrs);
     final blocks = pmDoc.children;
     for (var i = 0; i < blocks.length; i++) {
       writer.writeBlock(blocks[i]);
@@ -60,11 +60,14 @@ class _MediaImage {
 }
 
 class _DocumentWriter {
+  final Map<String, dynamic> _documentAttrs;
   final StringBuffer _body = StringBuffer();
   final List<_MediaImage> _images = [];
   var _usesBulletList = false;
   var _usesOrderedList = false;
   var _drawingId = 0;
+
+  _DocumentWriter(this._documentAttrs);
 
   // ------------------------------------------------------------- blocos
 
@@ -129,7 +132,17 @@ class _DocumentWriter {
   void _writeParagraph(model.PMNode block, {String? styleId, int? numId}) {
     _body.write('<w:p>');
     final align = _jcFor(block.attrs['textAlign']);
-    if (styleId != null || numId != null || align != null) {
+    final indentLeft = _lengthTwips(block.attrs['marginLeft']);
+    final indentRight = _lengthTwips(block.attrs['marginRight']);
+    final textIndent = _lengthTwips(block.attrs['textIndent']);
+    final tabStops = block.attrs['tabStops'];
+    if (styleId != null ||
+        numId != null ||
+        align != null ||
+        indentLeft != null ||
+        indentRight != null ||
+        textIndent != null ||
+        tabStops is List) {
       _body.write('<w:pPr>');
       if (styleId != null) _body.write('<w:pStyle w:val="$styleId"/>');
       if (numId != null) {
@@ -137,6 +150,32 @@ class _DocumentWriter {
             '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="$numId"/></w:numPr>');
       }
       if (align != null) _body.write('<w:jc w:val="$align"/>');
+      if (indentLeft != null || indentRight != null || textIndent != null) {
+        final attributes = StringBuffer();
+        if (indentLeft != null) attributes.write(' w:left="$indentLeft"');
+        if (indentRight != null) attributes.write(' w:right="$indentRight"');
+        if (textIndent != null) {
+          if (textIndent < 0) {
+            attributes.write(' w:hanging="${-textIndent}"');
+          } else {
+            attributes.write(' w:firstLine="$textIndent"');
+          }
+        }
+        _body.write('<w:ind$attributes/>');
+      }
+      if (tabStops is List && tabStops.isNotEmpty) {
+        _body.write('<w:tabs>');
+        for (final stop in tabStops) {
+          if (stop is! Map) continue;
+          final position = _lengthTwips(stop['position']);
+          if (position == null) continue;
+          final type = '${stop['type'] ?? 'left'}';
+          final leader = '${stop['leader'] ?? 'none'}';
+          _body.write(
+              '<w:tab w:val="$type" w:leader="$leader" w:pos="$position"/>');
+        }
+        _body.write('</w:tabs>');
+      }
       _body.write('</w:pPr>');
     }
     for (final child in block.children) {
@@ -154,10 +193,21 @@ class _DocumentWriter {
   }
 
   void _writeRun(String text, List<model.Mark> marks) {
-    _body.write('<w:r>');
     final props = _runProperties(marks);
-    if (props.isNotEmpty) _body.write('<w:rPr>$props</w:rPr>');
-    _body.write('<w:t xml:space="preserve">${_escape(text)}</w:t></w:r>');
+    final parts = text.split('\t');
+    for (var index = 0; index < parts.length; index++) {
+      final part = parts[index];
+      if (part.isNotEmpty) {
+        _body.write('<w:r>');
+        if (props.isNotEmpty) _body.write('<w:rPr>$props</w:rPr>');
+        _body.write('<w:t xml:space="preserve">${_escape(part)}</w:t></w:r>');
+      }
+      if (index < parts.length - 1) {
+        _body.write('<w:r>');
+        if (props.isNotEmpty) _body.write('<w:rPr>$props</w:rPr>');
+        _body.write('<w:tab/></w:r>');
+      }
+    }
   }
 
   String _runProperties(List<model.Mark> marks) {
@@ -184,8 +234,8 @@ class _DocumentWriter {
           if (color != null) props.write('<w:color w:val="$color"/>');
           final family = mark.attrs['fontFamily'];
           if (family is String && family.isNotEmpty) {
-            final name = _escape(
-                family.split(',').first.trim().replaceAll('"', ''));
+            final name =
+                _escape(family.split(',').first.trim().replaceAll('"', ''));
             props.write('<w:rFonts w:ascii="$name" w:hAnsi="$name"/>');
           }
           final halfPoints = _fontSizeHalfPoints(mark.attrs['fontSize']);
@@ -268,8 +318,7 @@ class _DocumentWriter {
     final cy = (heightPx * 9525).round();
     final id = ++_drawingId;
 
-    _body.write(
-        '<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
+    _body.write('<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
         '<wp:extent cx="$cx" cy="$cy"/>'
         '<wp:docPr id="$id" name="Imagem $id"/>'
         '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
@@ -313,6 +362,7 @@ class _DocumentWriter {
     put('_rels/.rels', _packageRelsXml());
     put('word/document.xml', _documentXml());
     put('word/styles.xml', _stylesXml());
+    put('word/settings.xml', _settingsXml());
     if (_usesBulletList || _usesOrderedList) {
       put('word/numbering.xml', _numberingXml());
     }
@@ -330,11 +380,27 @@ class _DocumentWriter {
       ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
       ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">'
       '<w:body>$_body'
-      // A4 com margens de 1" (twips).
-      '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
-      '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"'
-      ' w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>'
+      '${_sectionPropertiesXml()}'
       '</w:body></w:document>';
+
+  String _sectionPropertiesXml() {
+    final width = _lengthTwips(_documentAttrs['pageWidth']) ?? 11906;
+    final height = _lengthTwips(_documentAttrs['pageHeight']) ?? 16838;
+    final top = _lengthTwips(_documentAttrs['pageMarginTop']) ?? 1440;
+    final right = _lengthTwips(_documentAttrs['pageMarginRight']) ?? 1440;
+    final bottom = _lengthTwips(_documentAttrs['pageMarginBottom']) ?? 1440;
+    final left = _lengthTwips(_documentAttrs['pageMarginLeft']) ?? 1440;
+    final header = _lengthTwips(_documentAttrs['pageMarginHeader']) ?? 708;
+    final footer = _lengthTwips(_documentAttrs['pageMarginFooter']) ?? 708;
+    final gutter = _lengthTwips(_documentAttrs['pageMarginGutter']) ?? 0;
+    final orientation = _documentAttrs['pageOrientation'] == 'landscape'
+        ? ' w:orient="landscape"'
+        : '';
+    return '<w:sectPr><w:pgSz w:w="$width" w:h="$height"$orientation/>'
+        '<w:pgMar w:top="$top" w:right="$right" w:bottom="$bottom" '
+        'w:left="$left" w:header="$header" w:footer="$footer" '
+        'w:gutter="$gutter"/></w:sectPr>';
+  }
 
   String _contentTypesXml() {
     final overrides = StringBuffer();
@@ -342,6 +408,8 @@ class _DocumentWriter {
         '"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>');
     overrides.write('<Override PartName="/word/styles.xml" ContentType='
         '"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>');
+    overrides.write('<Override PartName="/word/settings.xml" ContentType='
+        '"application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>');
     if (_usesBulletList || _usesOrderedList) {
       overrides.write('<Override PartName="/word/numbering.xml" ContentType='
           '"application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>');
@@ -370,6 +438,9 @@ class _DocumentWriter {
     rels.write('<Relationship Id="rIdStyles" Type='
         '"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"'
         ' Target="styles.xml"/>');
+    rels.write('<Relationship Id="rIdSettings" Type='
+        '"http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings"'
+        ' Target="settings.xml"/>');
     if (_usesBulletList || _usesOrderedList) {
       rels.write('<Relationship Id="rIdNumbering" Type='
           '"http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering"'
@@ -387,8 +458,7 @@ class _DocumentWriter {
 
   String _stylesXml() {
     final styles = StringBuffer();
-    styles.write(
-        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">'
+    styles.write('<w:style w:type="paragraph" w:default="1" w:styleId="Normal">'
         '<w:name w:val="Normal"/></w:style>');
     // Tamanhos padrão do Word para Heading 1..6 (half-points).
     const headingSizes = [32, 26, 24, 22, 22, 22];
@@ -409,6 +479,20 @@ class _DocumentWriter {
         '<w:styles xmlns:w='
         '"http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
         '$styles</w:styles>';
+  }
+
+  String _settingsXml() {
+    final defaultTabStop =
+        _lengthTwips(_documentAttrs['defaultTabStop']) ?? 708;
+    final evenAndOdd = _documentAttrs['evenAndOddHeaders'] == true
+        ? '<w:evenAndOddHeaders/>'
+        : '';
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:settings xmlns:w='
+        '"http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        '<w:defaultTabStop w:val="$defaultTabStop"/>'
+        '$evenAndOdd'
+        '</w:settings>';
   }
 
   String _numberingXml() {
@@ -500,6 +584,25 @@ class _DocumentWriter {
     if (value is num) return value.toDouble();
     final match = RegExp(r'^([\d.]+)').firstMatch(value.toString().trim());
     return match != null ? double.tryParse(match.group(1)!) : null;
+  }
+
+  /// CSS length used by paragraph geometry → OOXML twips.
+  static int? _lengthTwips(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return (value * 15).round();
+    final match = RegExp(r'^(-?[\d.]+)\s*(px|pt|in|cm|mm)?$')
+        .firstMatch(value.toString().trim().toLowerCase());
+    if (match == null) return null;
+    final number = double.tryParse(match.group(1)!);
+    if (number == null) return null;
+    final twips = switch (match.group(2)) {
+      'pt' => number * 20,
+      'in' => number * 1440,
+      'cm' => number * 1440 / 2.54,
+      'mm' => number * 1440 / 25.4,
+      _ => number * 15,
+    };
+    return twips.round();
   }
 
   static String _escape(String text) => text

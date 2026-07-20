@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:web/web.dart' as web;
 
 import '../../prosemirror/model/index.dart';
@@ -16,6 +18,7 @@ Map<String, AttributeSpec> blockStyleAttributeSpecs() => {
       'marginBottom': nullableBlockAttribute(),
       'marginLeft': nullableBlockAttribute(),
       'textIndent': nullableBlockAttribute(),
+      'tabStops': nullableBlockAttribute(),
       'lineHeight': nullableBlockAttribute(),
       'fontFamily': nullableBlockAttribute(),
       'fontSize': nullableBlockAttribute(),
@@ -49,6 +52,16 @@ Map<String, dynamic> blockStyleAttrsFromDom(web.HTMLElement dom) {
     return raw == null ? null : int.tryParse(raw);
   }
 
+  dynamic jsonData(String name) {
+    final raw = dom.getAttribute(name);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return jsonDecode(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
   return {
     'textAlign': value('text-align'),
     'styleName': dom.getAttribute('data-docx-style'),
@@ -57,6 +70,7 @@ Map<String, dynamic> blockStyleAttrsFromDom(web.HTMLElement dom) {
     'marginBottom': value('margin-bottom'),
     'marginLeft': value('margin-left'),
     'textIndent': value('text-indent'),
+    'tabStops': jsonData('data-docx-tabs'),
     'lineHeight': value('line-height'),
     'fontFamily': value('font-family'),
     'fontSize': value('font-size'),
@@ -109,5 +123,7 @@ Map<String, dynamic> blockStyleDomAttrs(PMNode node) {
   data('data-docx-numbering-level', 'numberingLevel');
   data('data-docx-numbering-format', 'numberingFormat');
   data('data-docx-numbering-text', 'numberingText');
+  final tabStops = node.attrs['tabStops'];
+  if (tabStops != null) attrs['data-docx-tabs'] = jsonEncode(tabStops);
   return attrs;
 }

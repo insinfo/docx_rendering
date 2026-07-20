@@ -3,6 +3,7 @@ import '../../prosemirror/history/history.dart' as history;
 import '../../prosemirror/model/index.dart';
 import '../../prosemirror/schema_list/index.dart' as schema_list;
 import '../../prosemirror/state/index.dart';
+import '../extensions/table_commands.dart' as tables;
 import 'commands.dart';
 import 'editor.dart';
 
@@ -233,6 +234,88 @@ class CommandManager {
       final node = table.create(null, Fragment.fromArray(rowNodes));
       return insertNodeCommand(node)(state, dispatch, view);
     });
+    return this;
+  }
+
+  // --------------------------------------------------------------- tabela
+
+  CommandManager addColumnBefore() {
+    _commands.add(tables.addColumnCommand(before: true));
+    return this;
+  }
+
+  CommandManager addColumnAfter() {
+    _commands.add(tables.addColumnCommand(before: false));
+    return this;
+  }
+
+  CommandManager addRowBefore() {
+    _commands.add(tables.addRowCommand(before: true));
+    return this;
+  }
+
+  CommandManager addRowAfter() {
+    _commands.add(tables.addRowCommand(before: false));
+    return this;
+  }
+
+  CommandManager deleteColumn() {
+    _commands.add(tables.deleteColumnCommand());
+    return this;
+  }
+
+  CommandManager deleteRow() {
+    _commands.add(tables.deleteRowCommand());
+    return this;
+  }
+
+  CommandManager deleteTable() {
+    _commands.add(tables.deleteTableCommand());
+    return this;
+  }
+
+  CommandManager mergeCells() {
+    _commands.add(tables.mergeCellsCommand());
+    return this;
+  }
+
+  CommandManager splitCell() {
+    _commands.add(tables.splitCellCommand());
+    return this;
+  }
+
+  CommandManager toggleHeaderRow() {
+    _commands.add(tables.toggleHeaderRowCommand());
+    return this;
+  }
+
+  CommandManager setCellAttrs(Map<String, dynamic> attrs) {
+    _commands.add(tables.setCellAttrsCommand(attrs));
+    return this;
+  }
+
+  CommandManager setCellBackground(String? color) {
+    _commands.add(tables.setCellAttrsCommand({'backgroundColor': color}));
+    return this;
+  }
+
+  CommandManager setCellBorders(String sides, String? css) {
+    _commands.add(tables.setCellBordersCommand(sides, css));
+    return this;
+  }
+
+  CommandManager setRowHeight(String? height) {
+    _commands.add(tables.setRowHeightCommand(height));
+    return this;
+  }
+
+  CommandManager setTableAttrs(Map<String, dynamic> attrs) {
+    _commands.add(tables.setTableAttrsCommand(attrs));
+    return this;
+  }
+
+  CommandManager setColumnWidths(List<int> widths) {
+    _commands.add(tables.setColumnWidthsCommand(widths));
     return this;
   }
 

@@ -128,6 +128,11 @@ Future<void> main() async {
       '() => document.querySelector(".ProseMirror").getAttribute("contenteditable") === "false"',
       'read-only mode',
     );
+    await _waitUntil(
+      page,
+      '() => getComputedStyle(document.querySelector(".tiptap-vertical-ruler")).display === "none" && getComputedStyle(document.querySelector(".tiptap-horizontal-ruler-track")).display === "none"',
+      'rulers hidden in read-only mode',
+    );
     await page.click('button[aria-label="Alternar tema"]');
     await _waitUntil(
       page,
@@ -150,27 +155,38 @@ Future<void> main() async {
     final rulerMetrics = Map<String, dynamic>.from(
       await page.evaluate('''() => {
         const viewport = document.querySelector('.document-viewport');
-        const ruler = viewport?.querySelector(':scope > .tiptap-vertical-ruler');
+        const pageScale = viewport?.querySelector('.page-scale');
+        const ruler = pageScale?.querySelector(':scope > .tiptap-vertical-ruler');
+        const horizontal = viewport?.querySelector(':scope > .tiptap-horizontal-ruler-track');
         const pageSheet = viewport?.querySelector('.page-sheet');
         const viewportRect = viewport?.getBoundingClientRect();
         const rulerRect = ruler?.getBoundingClientRect();
         const pageRect = pageSheet?.getBoundingClientRect();
         return {
           exists: !!ruler,
-          centimetres: ruler?.querySelectorAll('.tiptap-ruler-number').length || 0,
+          horizontalExists: !!horizontal,
+          marks: ruler?.querySelectorAll('.tiptap-ruler-num, .tiptap-ruler-tick').length || 0,
+          indents: horizontal?.querySelectorAll('.tiptap-ruler-indent').length || 0,
+          pageHeight: pageRect?.height,
+          rulerHeight: rulerRect?.height,
           viewportLeft: viewportRect?.left,
           rulerLeft: rulerRect?.left,
           pageLeft: pageRect?.left,
           pageGap: pageRect && rulerRect ? pageRect.left - rulerRect.right : null,
           alignedToPage: !!rulerRect && !!pageRect &&
-            pageRect.left - rulerRect.right >= 4 &&
-            pageRect.left - rulerRect.right <= 9,
+            pageRect.left - rulerRect.right >= 5 &&
+            pageRect.left - rulerRect.right <= 9 &&
+            Math.abs(pageRect.height - rulerRect.height) <= 1,
         };
       }''') as Map,
     );
     _check(rulerMetrics['exists'] == true, 'Vertical ruler is missing.');
-    _check(rulerMetrics['centimetres'] == 31,
-        'Vertical ruler centimetre markers are incomplete.');
+    _check(rulerMetrics['horizontalExists'] == true,
+        'Horizontal ruler is missing.');
+    _check((rulerMetrics['marks'] as num) > 0,
+        'Vertical ruler marks are missing.');
+    _check(rulerMetrics['indents'] == 4,
+        'Horizontal ruler indent markers are incomplete.');
     _check(rulerMetrics['alignedToPage'] == true,
         'Vertical ruler is not attached to the page edge: $rulerMetrics');
 
